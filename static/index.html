@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoodFit — 오늘 뭐 입지?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ── 로그인 ─────────────────────────────────────── -->
+<section id="authScreen" class="auth" hidden>
+  <div class="auth-box">
+    <div class="logo logo-lg">Mood<em>Fit</em></div>
+    <p class="muted">기분·날씨·상황에 맞춰 내 옷장에서 오늘의 코디를 골라 드려요.</p>
+
+    <div class="segmented" role="tablist">
+      <button class="seg active" data-auth-tab="login" role="tab" type="button">로그인</button>
+      <button class="seg" data-auth-tab="signup" role="tab" type="button">회원가입</button>
+    </div>
+
+    <form id="loginForm" class="stack">
+      <input name="email" type="email" placeholder="이메일" autocomplete="email" required>
+      <input name="password" type="password" placeholder="비밀번호" autocomplete="current-password" required>
+      <p class="form-error" data-error></p>
+      <button class="btn btn-primary" type="submit">로그인</button>
+    </form>
+
+    <form id="signupForm" class="stack" hidden>
+      <input name="nickname" placeholder="닉네임" maxlength="20" required>
+      <input name="email" type="email" placeholder="이메일" autocomplete="email" required>
+      <input name="password" type="password" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" minlength="8" required>
+      <p class="form-error" data-error></p>
+      <button class="btn btn-primary" type="submit">가입하기</button>
+    </form>
+
+    <button class="link-btn" id="demoBtn" type="button">데모 계정으로 둘러보기</button>
+  </div>
+</section>
+
+<!-- ── 앱 ─────────────────────────────────────────── -->
+<div id="appScreen" hidden>
+  <header class="topbar">
+    <div class="logo">Mood<em>Fit</em></div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="today" role="tab">오늘의 코디</button>
+      <button class="tab" data-tab="wardrobe" role="tab">내 옷장 <span class="count" id="wardrobeCount"></span></button>
+      <button class="tab" data-tab="profile" role="tab">내 프로필</button>
+    </nav>
+    <div class="user">
+      <span id="nickname"></span>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn">로그아웃</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 오늘의 코디 -->
+    <section id="tab-today" class="tab-panel">
+      <div class="today-grid">
+        <div class="card">
+          <h2 class="card-title">오늘의 날씨</h2>
+          <div class="weather">
+            <div class="weather-main">
+              <span class="weather-temp" id="wTemp">--</span><span class="weather-unit">°C</span>
+              <div>
+                <div id="wDesc" class="weather-desc">날씨를 불러오세요</div>
+                <div id="wMeta" class="muted small"></div>
+              </div>
+            </div>
+            <div class="row">
+              <input id="cityInput" placeholder="도시 (예: 서울, 수원)" list="cityList">
+              <datalist id="cityList"></datalist>
+              <button class="btn btn-ghost btn-sm" id="citySearchBtn" type="button">검색</button>
+              <button class="btn btn-ghost btn-sm" id="geoBtn" type="button">📍 현재 위치</button>
+            </div>
+            <p class="small muted" id="weatherMsg"></p>
+            <details id="manualWeather">
+              <summary>직접 입력하기</summary>
+              <div class="row">
+                <label>기온 <input id="mTemp" type="number" min="-30" max="45" value="15"> °C</label>
+                <label>날씨
+                  <select id="mDesc"><option>맑음</option><option>구름많음</option><option>흐림</option><option>비</option><option>눈</option></select>
+                </label>
+                <label>습도 <input id="mHum" type="number" min="0" max="100" value="50"> %</label>
+              </div>
+            </details>
+          </div>
+
+          <h2 class="card-title">오늘의 기분</h2>
+          <div class="chips" id="moodChips" data-single></div>
+
+          <h2 class="card-title">오늘의 상황 <span class="muted small">최대 4개</span></h2>
+          <div class="chips" id="occasionChips"></div>
+
+          <h2 class="card-title">선호 스타일</h2>
+          <div class="chips" id="styleChips" data-single></div>
+
+          <button class="btn btn-primary btn-lg" id="recommendBtn" type="button">✦ 오늘의 코디 추천받기</button>
+          <p class="small muted" id="wardrobeNote"></p>
+        </div>
+
+        <div class="card result" id="resultCard">
+          <div class="empty" id="resultEmpty">
+            <div class="empty-icon">✦</div>
+            <p>조건을 고르고 추천받기를 눌러 보세요.</p>
+            <p class="small muted">옷장에 옷을 등록해 두면 내가 가진 옷 중에서 골라 드려요.</p>
+          </div>
+          <div class="loading" id="resultLoading" hidden><div class="spinner"></div><span>코디를 고르는 중…</span></div>
+          <div id="resultBody" hidden>
+            <h2 class="card-title">오늘의 코디</h2>
+            <div class="pick-grid" id="pickGrid"></div>
+            <div class="answer" id="answerText"></div>
+            <details class="why">
+              <summary>어떻게 골랐나요?</summary>
+              <p class="small">옷마다 <b>날씨(계절) 30 · 상황 25 · 기분 20 · 최근 착용 10 · 색상 정보 5</b>점으로 점수를 매겨,
+                카테고리별 1순위를 AI에게 먼저 알려 줬어요. AI는 그 안에서 조합을 고르고 이유를 설명해요.</p>
+              <ul class="small" id="candidateList"></ul>
+            </details>
+            <div class="row">
+              <button class="btn btn-primary" id="wearBtn" type="button" hidden>이 코디로 결정</button>
+              <button class="btn btn-ghost" id="againBtn" type="button">다시 추천받기</button>
+            </div>
+            <p class="small muted" id="wearMsg"></p>
+          </div>
+          <p class="form-error" id="resultError"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 내 옷장 -->
+    <section id="tab-wardrobe" class="tab-panel" hidden>
+      <div class="card">
+        <div class="row space-between">
+          <div class="chips" id="filterChips" data-single></div>
+          <div class="row">
+            <label class="btn btn-ghost btn-sm">📷 여러 장 한 번에
+              <input type="file" accept="image/*" multiple id="bulkInput" hidden>
+            </label>
+            <button class="btn btn-primary btn-sm" id="addItemBtn" type="button">+ 옷 추가</button>
+          </div>
+        </div>
+        <p class="hint" id="unclassifiedHint" hidden></p>
+        <div class="item-grid" id="itemGrid"></div>
+      </div>
+    </section>
+
+    <!-- 내 프로필 -->
+    <section id="tab-profile" class="tab-panel" hidden>
+      <form class="card profile" id="profileForm">
+        <p class="muted small">추천할 때 참고하는 정보예요. 모두 선택 사항이에요.</p>
+        <h2 class="card-title">성별</h2><div class="chips" data-field="gender" data-single></div>
+        <h2 class="card-title">체형</h2><div class="chips" data-field="body_type" data-single></div>
+        <h2 class="card-title">피부톤</h2><div class="chips" data-field="skin_tone" data-single></div>
+        <h2 class="card-title">퍼스널 컬러</h2><div class="chips" data-field="personal_color" data-single></div>
+        <div class="row">
+          <label>키 <input name="height_cm" type="number" min="100" max="230" placeholder="163"> cm</label>
+          <label>몸무게 <input name="weight_kg" type="number" min="25" max="250" placeholder="55"> kg</label>
+        </div>
+        <div class="row">
+          <button class="btn btn-primary" type="submit">저장</button>
+          <span class="small muted" id="profileMsg"></span>
+        </div>
+      </form>
+    </section>
+  </main>
+</div>
+
+<!-- 옷 추가 / 수정 -->
+<dialog id="itemDialog">
+  <form class="stack" id="itemForm">
+    <h3 id="itemDialogTitle">옷 추가</h3>
+    <label class="photo-drop" id="photoDrop">
+      <img id="photoPreview" alt="" hidden>
+      <span id="photoText">📷 사진 선택 (선택 사항)</span>
+      <input type="file" accept="image/*" id="photoInput" hidden>
+    </label>
+    <h4>카테고리</h4><div class="chips" data-item="category" data-single></div>
+    <h4>계절</h4><div class="chips" data-item="season" data-single></div>
+    <h4>스타일</h4><div class="chips" data-item="style" data-single></div>
+    <div class="row">
+      <input name="color" placeholder="색상 (사진에서 자동)" maxlength="20">
+      <input name="name" placeholder="이름 (예: 울 니트)" maxlength="50">
+    </div>
+    <p class="form-error" data-error></p>
+    <div class="row">
+      <button class="btn btn-primary" type="submit" id="itemSaveBtn">저장</button>
+      <button class="btn btn-ghost" type="button" id="itemCancelBtn">취소</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

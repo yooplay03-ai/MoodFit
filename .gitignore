@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# 비밀 값 (API 키, 토큰 서명 키)
+.env
+
+# 실행 중 생기는 데이터
+moodfit.db
+media/
+
+# 예전 작업 메모
+claude_prompt.txt
+claude_results.txt
