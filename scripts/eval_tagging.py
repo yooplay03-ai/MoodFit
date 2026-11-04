@@ -7,7 +7,7 @@ eval_tagging.py — 옷 사진 자동 분류가 얼마나 맞는지 잰다.
 비교:
   A. 제로샷 — CLIP 모델 2개 (일반 CLIP, 패션 사진으로 더 학습된 FashionCLIP)
   B. 선형 분류기 — CLIP 사진 벡터 위에 로지스틱 회귀를 학습 (5-fold 교차검증)
-  C. 색상 — 사진 평균색(예전 방식) vs 배경 제외 k-means(지금 방식)
+  C. 색상 — 사진 평균색 vs k-means(RGB 거리) vs k-means(Lab 거리 + 흰 옷 보정)
 선택: --photos 폴더에 내 옷 사진과 labels.csv를 넣으면, 실제 휴대폰 사진에서도 같은 평가를 한다.
 
 실행 (Colab GPU 권장):
@@ -104,7 +104,7 @@ def load_my_photos(folder: Path):
 def embed_all(samples, model_id, batch=32):
     tagger.MODEL_ID = model_id
     tagger._load.cache_clear()
-    torch, model, processor, banks = tagger._load()
+    torch, model, processor, banks, _ = tagger._load()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
     embs = []
@@ -146,7 +146,7 @@ def linear_probe(X, y, seed):
 
 def mean_color(image):
     a = np.asarray(image.resize((32, 32)), dtype=float)[8:24, 8:24].reshape(-1, 3).mean(0)
-    return tagger.nearest_color(a)
+    return tagger.nearest_color(a, space="rgb")
 
 
 def main():
@@ -162,9 +162,15 @@ def main():
     rows = []
 
     # 색상: 모델과 상관없는 비교
-    for method, fn in (("평균색(이전)", mean_color), ("k-means(현재)", lambda im: tagger.dominant_color(im)[0])):
-        acc, n = accuracy([fn(s["image"]) for s in samples], gold["color"])
+    color_methods = (("평균색", mean_color),
+                     ("k-means, RGB", lambda im: tagger.dominant_color(im, space="rgb")[0]),
+                     ("k-means, Lab + 흰 옷 보정", lambda im: tagger.dominant_color(im, space="lab")[0]))
+    for method, fn in color_methods:
+        pred = [fn(s["image"]) for s in samples]
+        acc, n = accuracy(pred, gold["color"])
         rows.append({"data": source, "model": "-", "field": "color", "method": method, "accuracy": round(acc, 3), "n": n})
+        wrong = Counter((g, p) for g, p in zip(gold["color"], pred) if g and g != p)
+        print(f"색상 [{method}] 자주 틀린 경우(정답 → 예측):", wrong.most_common(6))
 
     for model_id in MODELS:
         X, banks, ms = embed_all(samples, model_id)
