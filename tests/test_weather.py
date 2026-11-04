@@ -31,7 +31,51 @@ def test_parse_forecast_picks_next_hour():
     assert w["temp"] == 7 and w["humidity"] == 60 and w["desc"] == "구름많음"
 
 
-def test_weather_api_without_key_returns_503(client):
-    assert client.get("/api/weather?city=서울").status_code == 503
+def test_weather_api_validates_input(client):
     assert client.get("/api/weather?city=뉴욕").status_code == 404
     assert client.get("/api/weather").status_code == 422
+
+
+def test_encoded_key_is_decoded_and_xml_error_is_explained(monkeypatch):
+    """포털의 'Encoding' 키를 넣어도 두 번 인코딩되지 않고, XML 오류는 원인을 알려 준다."""
+    import httpx
+    from app import config
+    from app.services import weather as svc
+    monkeypatch.setattr(config, "KMA_API_KEY", "abc%2Bdef%3D%3D")
+    sent = {}
+
+    def fake_get(url, params, timeout):
+        sent.update(params)
+        xml = ("<OpenAPI_ServiceResponse><cmmMsgHeader><returnAuthMsg>SERVICE_KEY_IS_NOT_REGISTERED_ERROR"
+               "</returnAuthMsg></cmmMsgHeader></OpenAPI_ServiceResponse>")
+        return httpx.Response(200, text=xml)
+    monkeypatch.setattr(svc.httpx, "get", fake_get)
+    svc._cache.clear()
+    try:
+        svc.get_weather(37.5665, 126.9780)
+        assert False, "오류가 나야 한다"
+    except svc.WeatherError as e:
+        assert "SERVICE_KEY_IS_NOT_REGISTERED_ERROR" in str(e) and "활용신청" in str(e)
+    assert sent["serviceKey"] == "abc+def=="
+
+
+def test_without_kma_key_uses_open_meteo(client, monkeypatch):
+    """기상청 키가 없으면 키 없는 Open-Meteo로 날씨를 가져온다."""
+    import httpx
+    from app.services import weather as svc
+    data = {"current": {"time": "2026-11-04T21:15", "temperature_2m": 11.6, "relative_humidity_2m": 62,
+                        "apparent_temperature": 9.4, "weather_code": 61},
+            "hourly": {"time": ["2026-11-04T20:00", "2026-11-04T21:00"], "precipitation_probability": [40, 70]}}
+    called = {}
+
+    def fake_get(url, params, timeout):
+        called["url"] = url
+        return httpx.Response(200, json=data, request=httpx.Request("GET", url))
+    monkeypatch.setattr(svc.httpx, "get", fake_get)
+    svc._cache.clear()
+    r = client.get("/api/weather", params={"city": "서울"})
+    assert r.status_code == 200
+    body = r.json()
+    assert called["url"] == svc.OPEN_METEO_URL
+    assert body == {"temp": 12, "desc": "비", "humidity": 62, "feels_like": 9, "rain_prob": 70,
+                    "source": "Open-Meteo", "place": "서울"}

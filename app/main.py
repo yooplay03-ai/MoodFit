@@ -49,7 +49,7 @@ def health():
         tagging = tagger.installed()
     except ImportError:
         tagging = False
-    return {"status": "ok", "llm": bool(config.GROQ_API_KEY), "weather": bool(config.KMA_API_KEY), "photo_tagging": tagging}
+    return {"status": "ok", "llm": bool(config.GROQ_API_KEY), "weather": "기상청" if config.KMA_API_KEY else "Open-Meteo", "photo_tagging": tagging}
 
 
 @app.get("/", include_in_schema=False)

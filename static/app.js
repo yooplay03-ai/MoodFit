@@ -147,7 +147,8 @@ function showWeather(w) {
   $('#wDesc').textContent = `${w.place ? w.place + ' · ' : ''}${w.desc}`;
   const feels = w.feels_like != null && w.feels_like !== w.temp ? ` · 체감 ${w.feels_like}°C` : '';
   const rain = w.rain_prob != null ? ` · 강수확률 ${w.rain_prob}%` : '';
-  $('#wMeta').textContent = `습도 ${w.humidity}%${feels}${rain}`;
+  const src = w.source ? ` · 출처 ${w.source}` : '';
+  $('#wMeta').textContent = `습도 ${w.humidity}%${feels}${rain}${src}`;
   $('#weatherMsg').textContent = '';
   $('#manualWeather').open = false;
 }

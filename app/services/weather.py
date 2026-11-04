@@ -1,5 +1,10 @@
 """
-weather.py — 기상청 단기예보(공공데이터포털)로 지금 날씨를 가져온다.
+weather.py — 지금 날씨를 가져온다.
+
+기상청 단기예보(공공데이터포털) 키가 있으면 기상청을 쓰고, 없으면 키가 필요 없는 Open-Meteo를 쓴다.
+(공공데이터포털 키는 발급·승인 절차가 있어, 처음 실행하는 사람도 날씨가 바로 나오게 하기 위함)
+
+기상청:
 
 - 위도·경도를 기상청 격자 좌표(nx, ny)로 바꾼다 (기상청 제공 Lambert 투영 공식).
 - 예보는 하루 8번(02, 05, 08 … 23시) 발표되고 10분 뒤부터 조회되므로, 가장 최근 발표 시각을 계산해 요청한다.
@@ -7,7 +12,9 @@ weather.py — 기상청 단기예보(공공데이터포털)로 지금 날씨를
 """
 
 import math
+import re
 import time
+from urllib.parse import unquote
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -15,6 +22,7 @@ import httpx
 from app import config
 
 KST = timezone(timedelta(hours=9))
+OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 URL = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
 CACHE_SECONDS = 30 * 60
 _cache: dict[tuple, tuple[float, dict]] = {}
@@ -113,9 +121,72 @@ def parse_forecast(items: list[dict], now: datetime) -> dict:
     }
 
 
+KEY_HELP = {
+    "SERVICE_KEY_IS_NOT_REGISTERED_ERROR": "등록되지 않은 키 — 활용신청 승인 후 1~2시간 뒤부터 쓸 수 있어요. .env의 키를 다시 복사해 보세요",
+    "SERVICE_ACCESS_DENIED_ERROR": "이 API(단기예보) 활용신청이 안 된 키예요",
+    "LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR": "오늘 호출 한도를 넘었어요",
+}
+
+
+def xml_error(text: str) -> str:
+    """기상청이 XML로 보낸 오류 응답에서 원인 코드를 찾아 한국어 설명을 붙인다."""
+    for tag in ("returnAuthMsg", "resultMsg", "errMsg"):
+        m = re.search(rf"<{tag}>([^<]+)</{tag}>", text)
+        if m:
+            code = m.group(1).strip()
+            return f"{code} — {KEY_HELP[code]}" if code in KEY_HELP else code
+    return "알 수 없는 응답"
+
+
+# Open-Meteo 날씨 코드(WMO) → 화면 설명. 비·눈 여부가 추천에 중요하므로 그 둘을 먼저 구분한다.
+def wmo_describe(code: int) -> str:
+    if code in (71, 73, 75, 77, 85, 86):
+        return "눈"
+    if code in (80, 81, 82):
+        return "소나기"
+    if 51 <= code <= 67 or code >= 95:
+        return "비"
+    if code in (45, 48):
+        return "흐림"            # 안개
+    return {0: "맑음", 1: "맑음", 2: "구름많음", 3: "흐림"}.get(code, "맑음")
+
+
+def parse_open_meteo(data: dict) -> dict:
+    cur = data["current"]
+    hourly = data.get("hourly", {})
+    hour = cur["time"][:13] + ":00"             # "2026-11-04T21:15" → 그 시각의 강수확률
+    probs = dict(zip(hourly.get("time", []), hourly.get("precipitation_probability", [])))
+    return {
+        "temp": round(cur["temperature_2m"]),
+        "desc": wmo_describe(int(cur.get("weather_code", 0))),
+        "humidity": int(cur.get("relative_humidity_2m", 50)),
+        "feels_like": round(cur.get("apparent_temperature", cur["temperature_2m"])),
+        "rain_prob": int(probs.get(hour) or 0),
+    }
+
+
+def get_open_meteo(lat: float, lon: float) -> dict:
+    key = ("open-meteo", round(lat, 2), round(lon, 2), datetime.now(KST).strftime("%Y%m%d%H"))
+    hit = _cache.get(key)
+    if hit and time.time() - hit[0] < CACHE_SECONDS:
+        return hit[1]
+    params = {"latitude": lat, "longitude": lon, "timezone": "Asia/Seoul", "forecast_days": 1,
+              "current": "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code",
+              "hourly": "precipitation_probability"}
+    try:
+        res = httpx.get(OPEN_METEO_URL, params=params, timeout=10)
+        res.raise_for_status()
+        result = parse_open_meteo(res.json())
+    except (httpx.HTTPError, ValueError, KeyError) as e:
+        raise WeatherError(f"Open-Meteo 응답을 읽지 못했습니다: {type(e).__name__}") from e
+    result["source"] = "Open-Meteo"
+    _cache[key] = (time.time(), result)
+    return result
+
+
 def get_weather(lat: float, lon: float, now: datetime | None = None) -> dict:
     if not config.KMA_API_KEY:
-        raise WeatherNotConfigured("KMA_API_KEY가 설정되지 않았습니다.")
+        return get_open_meteo(lat, lon)      # 기상청 키가 없으면 키 없는 날씨 API로
     now = now or datetime.now(KST)
     nx, ny = latlon_to_grid(lat, lon)
     base_date, base_time = latest_base_time(now)
@@ -124,18 +195,25 @@ def get_weather(lat: float, lon: float, now: datetime | None = None) -> dict:
     if hit and time.time() - hit[0] < CACHE_SECONDS:
         return hit[1]
 
-    params = {"serviceKey": config.KMA_API_KEY, "numOfRows": 300, "pageNo": 1, "dataType": "JSON",
+    # 공공데이터포털 키는 'Encoding'(%2B 등 포함)과 'Decoding' 두 가지가 있다.
+    # httpx가 한 번 더 인코딩하므로, 어느 쪽을 넣어도 되게 먼저 풀어서(Decoding 키로 만들어) 보낸다.
+    params = {"serviceKey": unquote(config.KMA_API_KEY.strip()), "numOfRows": 300, "pageNo": 1, "dataType": "JSON",
               "base_date": base_date, "base_time": base_time, "nx": nx, "ny": ny}
     try:
         res = httpx.get(URL, params=params, timeout=10)
+    except httpx.HTTPError as e:
+        raise WeatherError(f"기상청에 연결하지 못했습니다: {type(e).__name__}") from e
+    try:
         data = res.json()
-    except (httpx.HTTPError, ValueError) as e:
-        raise WeatherError(f"기상청 응답을 읽지 못했습니다: {type(e).__name__}") from e
+    except ValueError:
+        # 키 오류 등은 JSON을 요청해도 XML로 온다 → 그 안의 오류 메시지를 꺼내 보여 준다
+        raise WeatherError(f"기상청 오류: {xml_error(res.text)} (HTTP {res.status_code})")
     items = (data.get("response", {}).get("body") or {}).get("items", {}).get("item")
     if not items:
         msg = data.get("response", {}).get("header", {}).get("resultMsg", "데이터 없음")
         raise WeatherError(f"기상청 오류: {msg}")
 
     result = parse_forecast(items, now)
+    result["source"] = "기상청"
     _cache[key] = (time.time(), result)
     return result
