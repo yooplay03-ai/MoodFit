@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import config
-from app.db import Base, engine
+from app.db import Base, add_missing_columns, engine
 from app.routers import auth, recommend, wardrobe, weather
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -22,6 +22,7 @@ STATIC_DIR = config.BASE_DIR / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(engine)          # 테이블이 없으면 만든다
+    add_missing_columns()                     # 예전 DB 파일에 새 열 추가
     if config.SECRET_KEY == config.DEV_SECRET:
         logging.warning("SECRET_KEY가 개발용 기본값입니다. 배포할 때는 .env에 긴 무작위 값을 넣으세요.")
     config.MEDIA_DIR.mkdir(parents=True, exist_ok=True)

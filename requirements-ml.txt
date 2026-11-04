@@ -4,3 +4,5 @@ torch>=2.2
 transformers>=4.40
 pillow>=10.0
 numpy>=1.26
+# 옷 사진 배경 제거(선택). 처음 쓸 때 모델(약 170MB)을 내려받는다.
+rembg[cpu]>=2.0

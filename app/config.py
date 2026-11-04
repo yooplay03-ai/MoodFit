@@ -27,4 +27,5 @@ TOKEN_EXPIRE_HOURS = int(os.environ.get("TOKEN_EXPIRE_HOURS", "72"))
 
 DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR / 'moodfit.db'}")
 MEDIA_DIR = Path(os.environ.get("MEDIA_DIR", BASE_DIR / "media"))   # 옷 사진 저장 폴더
+PHOTO_CUTOUT = os.environ.get("PHOTO_CUTOUT", "1") == "1"                # 옷 사진 배경 제거 (rembg 필요)
 MAX_PHOTO_BYTES = 2 * 1024 * 1024                                   # 사진 1장 최대 2MB (브라우저에서 줄여서 올림)

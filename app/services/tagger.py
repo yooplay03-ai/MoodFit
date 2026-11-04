@@ -27,6 +27,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from app.schemas import SEASON_CHECK_CATEGORIES
+
 log = logging.getLogger("moodfit")
 
 MODEL_ID = os.environ.get("TAGGER_MODEL", "patrickjohncyh/fashion-clip")
@@ -46,13 +48,15 @@ CATEGORY_PROMPTS = {
     "액세서리": ["a cap", "a hat", "a belt", "a watch", "a scarf", "a pair of sunglasses", "a necklace"],
 }
 # 계절은 '두께·소재'로 판단한다 (봄·가을은 추천 점수에서 같은 간절기로 취급하므로 '가을' 하나로 둔다)
+# v2: 개발용 사진 15벌에서 두꺼운 치마 2벌이 여름으로 나와, 특정 옷 이름 대신 소재 문장(울·골지·린넨)을 보강했다.
 THICKNESS_PROMPTS = {
     "겨울": ["a thick padded puffer jacket", "a heavy wool knit sweater", "a warm fleece jacket",
-            "a thick wool coat", "thick warm winter clothing"],
+            "a thick wool coat", "thick warm winter clothing",
+            "clothing made of thick wool fabric", "ribbed knit clothing"],
     "가을": ["a light jacket", "a cotton sweatshirt", "a hoodie", "a cardigan", "a long-sleeve shirt",
-            "a pair of jeans", "a corduroy skirt"],
+            "a pair of jeans", "corduroy clothing", "clothing made of medium-weight cotton"],
     "여름": ["a thin short-sleeve t-shirt", "a sleeveless top", "a pair of shorts", "a thin linen shirt",
-            "light thin summer clothing"],
+            "light thin summer clothing", "clothing made of thin linen or chiffon fabric"],
 }
 SEASONLESS = {"가방", "액세서리"}
 USE_PROBE = {"style"}        # 학습한 분류기를 쓰는 항목 (계절 분류기는 실제 사진에서 틀려 쓰지 않음)
@@ -64,6 +68,23 @@ STYLE_PROMPTS = {
     "미니멀": ["minimal simple clean clothing"],
     "빈티지": ["vintage retro clothing"],
     "스포티": ["sportswear", "athletic gym clothing"],
+}
+
+# 이름 붙이기용 세부 종류 (분류 정확도에 영향을 주지 않도록 CATEGORY_PROMPTS와 따로 둔다)
+KIND_PROMPTS = {
+    "상의": {"티셔츠": "a t-shirt", "셔츠": "a button-up shirt", "니트": "a knit sweater", "후드티": "a hoodie",
+            "맨투맨": "a sweatshirt", "블라우스": "a blouse", "카디건": "a cardigan", "민소매": "a sleeveless top"},
+    "하의": {"청바지": "a pair of jeans", "슬랙스": "a pair of tailored trousers", "와이드 팬츠": "a pair of wide-leg pants",
+            "트레이닝 바지": "a pair of sweatpants", "반바지": "a pair of shorts", "미니스커트": "a mini skirt",
+            "롱스커트": "a long skirt"},
+    "아우터": {"재킷": "a jacket", "코트": "a coat", "블레이저": "a blazer", "패딩": "a padded puffer jacket",
+             "카디건": "a cardigan", "트렌치코트": "a trench coat", "가죽 재킷": "a leather jacket"},
+    "신발": {"스니커즈": "a pair of sneakers", "구두": "a pair of dress shoes", "부츠": "a pair of boots",
+            "샌들": "a pair of sandals", "로퍼": "a pair of loafers"},
+    "가방": {"핸드백": "a handbag", "백팩": "a backpack", "토트백": "a tote bag", "숄더백": "a shoulder bag",
+            "크로스백": "a crossbody bag"},
+    "액세서리": {"모자": "a cap", "벨트": "a belt", "시계": "a watch", "머플러": "a scarf", "선글라스": "a pair of sunglasses",
+              "목걸이": "a necklace"},
 }
 
 PALETTE = {
@@ -192,6 +213,10 @@ def _load():
     text_banks = {name: encode_texts(m) for name, m in
                   (("category", CATEGORY_PROMPTS), ("season", THICKNESS_PROMPTS), ("style", STYLE_PROMPTS),
                    ("color", COLOR_PROMPTS))}
+    # 이름용: 세부 종류 문장마다 벡터 하나씩 (평균 내지 않음)
+    for category, kinds in KIND_PROMPTS.items():
+        names = list(kinds)
+        text_banks[f"kind:{category}"] = encode_texts({n: [kinds[n]] for n in names})
     probes = load_probes(torch)
     log.info("CLIP 모델 준비 완료: %s (학습한 분류기: %s)", MODEL_ID, ", ".join(probes) or "없음")
     return torch, model, processor, text_banks, probes
@@ -246,6 +271,13 @@ def analyze(photo_bytes: bytes) -> dict:
         result[field] = {"value": label, "confidence": round(conf, 3), "scores": scores, "method": method}
     if result["category"]["value"] in SEASONLESS:
         result["season"] = {"value": "사계절", "confidence": 1.0, "scores": {}, "method": "rule"}
+    # 하의는 사진으로 원단 두께를 알기 어려워 계절이 자주 틀린다 → 화면에서 사용자 확인을 받게 표시
+    result["season"]["needs_check"] = result["category"]["value"] in SEASON_CHECK_CATEGORIES
     kmeans_color, share = dominant_color(image)
     result["color"]["kmeans"] = kmeans_color          # 비교용으로 함께 돌려준다
+    # 이름 제안: 색 + 세부 종류 (예: "블랙 토트백")
+    kind_bank = banks.get(f"kind:{result['category']['value']}")
+    if kind_bank:
+        kind, kind_conf, _ = classify(emb, *kind_bank)
+        result["name"] = {"value": f"{result['color']['value']} {kind}", "confidence": round(kind_conf, 3)}
     return result

@@ -7,7 +7,7 @@ clothing_items   옷장 아이템 (회원 1명 : 옷 N벌)
 
 from datetime import datetime, timezone
 
-from sqlalchemy import ForeignKey, Integer, String, DateTime
+from sqlalchemy import Boolean, ForeignKey, Integer, String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -44,6 +44,7 @@ class ClothingItem(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     category: Mapped[str] = mapped_column(String(10))           # 상의/하의/아우터/신발/가방/액세서리/미분류
     season: Mapped[str] = mapped_column(String(10), default="사계절")
+    season_by_user: Mapped[bool] = mapped_column(Boolean, default=False)   # 사용자가 직접 고른 계절이면 AI가 덮어쓰지 않는다
     style: Mapped[str] = mapped_column(String(10), default="캐주얼")
     color: Mapped[str] = mapped_column(String(20), default="")
     name: Mapped[str] = mapped_column(String(50), default="")

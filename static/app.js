@@ -241,11 +241,14 @@ function itemCard(item, { label, actions = '' } = {}) {
   const photo = item.photo_url
     ? `<img src="${esc(item.photo_url)}" alt="${esc(item.name || item.category)}" loading="lazy">`
     : clothSvg(item);
-  const sub = [item.color, item.season, item.style].filter(Boolean).join(' · ');
+  // 제목: 이름(예: "블랙 토트백")이 있으면 이름, 없으면 종류. 추천 결과에서는 칸 이름(상의·하의…)을 앞에 붙인다.
+  const title = label ? (item.name ? `${label} · ${item.name}` : label) : (item.name || item.category);
+  const season = item.season_check ? `${item.season}?` : item.season;   // ?: AI 추측, 아직 확인 안 함
+  const sub = [item.name ? item.category : item.color, season, item.style].filter(Boolean).join(' · ');
   return `<div class="item">
     <div class="item-photo">${photo}</div>
     ${actions}
-    <div class="item-info"><b>${esc(label || item.name || item.category)}</b><span class="muted">${esc(label && item.name ? item.name + ' · ' + sub : sub)}</span></div>
+    <div class="item-info"><b>${esc(title)}</b><span class="muted">${esc(sub)}</span></div>
   </div>`;
 }
 
@@ -322,6 +325,10 @@ function renderWardrobe() {
   $('#unclassifiedHint').hidden = unclassified === 0;
   $('#unclassifiedHint').textContent = `🏷 미분류 ${unclassified}벌 — 카드의 카테고리 버튼을 한 번 눌러 정리해 주세요. 정리 전에는 추천에 쓰지 않아요.`;
 
+  const toCheck = items.filter(i => i.season_check).length;
+  $('#seasonHint').hidden = toCheck === 0;
+  $('#seasonHint').textContent = `👖 하의 ${toCheck}벌은 계절을 한 번 골라 주세요. 바지·치마는 사진만으로 원단 두께를 알기 어려워 AI가 자주 틀려요. 고른 계절은 다시 분석해도 바뀌지 않아요.`;
+
   const filters = ['전체', ...OPTIONS.category, ...(unclassified ? ['미분류'] : [])];
   if (!filters.includes(state.filter)) state.filter = '전체';
   renderChips($('#filterChips'), filters, { selected: () => state.filter, onChange: v => { state.filter = v; renderWardrobe(); } });
@@ -339,9 +346,14 @@ function renderWardrobe() {
       <button class="icon-btn" data-edit="${it.id}" title="수정" aria-label="수정">✎</button>
       <button class="icon-btn" data-del="${it.id}" title="삭제" aria-label="삭제">✕</button></div>`;
     const card = itemCard(it, { actions });
-    if (it.category !== '미분류') return card;
-    const quick = `<div class="quick-cat">${OPTIONS.category.map(c => `<button type="button" data-quick="${it.id}" data-cat="${c}">${c}</button>`).join('')}</div>`;
-    return card.replace('<div class="item-info">', quick + '<div class="item-info">');
+    let quick = '';
+    if (it.category === '미분류') {
+      quick = `<div class="quick-cat">${OPTIONS.category.map(c => `<button type="button" data-quick="${it.id}" data-cat="${c}">${c}</button>`).join('')}</div>`;
+    } else if (it.season_check) {   // AI가 추측한 계절은 점선으로 표시하고, 하나를 누르면 확정
+      quick = `<div class="quick-cat quick-season" title="계절을 골라 주세요">${OPTIONS.season.map(s =>
+        `<button type="button" data-season-of="${it.id}" data-season="${s}"${s === it.season ? ' class="guess"' : ''}>${s}</button>`).join('')}</div>`;
+    }
+    return quick ? card.replace('<div class="item-info">', quick + '<div class="item-info">') : card;
   }).join('');
 }
 
@@ -354,6 +366,8 @@ async function onGridClick(e) {
       await api(`/api/wardrobe/${t.dataset.del}`, { method: 'DELETE' });
     } else if (t.dataset.quick) {
       await api(`/api/wardrobe/${t.dataset.quick}`, { method: 'PATCH', body: { category: t.dataset.cat } });
+    } else if (t.dataset.seasonOf) {
+      await api(`/api/wardrobe/${t.dataset.seasonOf}`, { method: 'PATCH', body: { season: t.dataset.season } });
     } else if (t.dataset.reanalyze) {
       t.textContent = '…'; t.disabled = true;
       await api(`/api/wardrobe/${t.dataset.reanalyze}/reanalyze`, { method: 'POST' });
@@ -405,6 +419,7 @@ function dominantColor(canvas) {
 function openItemDialog(item = null) {
   state.editingId = item ? item.id : null;
   state.photoBlob = null;
+  state.seasonTouched = false;          // 사용자가 계절을 직접 눌렀는지 (안 눌렀으면 AI 추측으로 저장)
   state.itemFields = { category: item?.category ?? '상의', season: item?.season ?? '사계절', style: item?.style ?? '캐주얼' };
   const form = $('#itemForm');
   form.reset();
@@ -419,7 +434,7 @@ function openItemDialog(item = null) {
   const cats = item?.category === '미분류' ? [...OPTIONS.category, '미분류'] : OPTIONS.category;
   [['category', cats], ['season', OPTIONS.season], ['style', OPTIONS.style]].forEach(([key, values]) =>
     renderChips(form.querySelector(`[data-item="${key}"]`), values,
-      { selected: () => state.itemFields[key], onChange: v => state.itemFields[key] = v }));
+      { selected: () => state.itemFields[key], onChange: v => { state.itemFields[key] = v; if (key === 'season') state.seasonTouched = true; } }));
   $('#itemDialog').showModal();
 }
 
@@ -459,10 +474,12 @@ async function autoTag(blob) {
       if (key === 'category' && confidence < CONFIDENT) { notes.push(`종류는 확실하지 않아요(${value}?)`); continue; }
       state.itemFields[key] = value;
       renderChips(form.querySelector(`[data-item="${key}"]`), key === 'category' ? OPTIONS.category : OPTIONS[key],
-        { selected: () => state.itemFields[key], onChange: v => state.itemFields[key] = v });
-      if (key !== 'category' && confidence < CONFIDENT) notes.push(`${value}`);
+        { selected: () => state.itemFields[key], onChange: v => { state.itemFields[key] = v; if (key === 'season') state.seasonTouched = true; } });
+      if (key === 'season' && tags.season.needs_check) notes.push(`계절(하의는 사진으로 두께를 알기 어려워요)`);
+      else if (key !== 'category' && confidence < CONFIDENT) notes.push(`${value}`);
     }
     form.color.value = tags.color.value;
+    if (tags.name && !form.name.value) form.name.value = tags.name.value;
     const pct = Math.round(tags.category.confidence * 100);
     status.textContent = `✦ AI가 채웠어요 — ${tags.category.value} ${pct}% · ${tags.color.value}` +
       (notes.length ? ` · 확인 필요: ${notes.join(', ')}` : '') + '. 틀린 곳만 고쳐 주세요.';
@@ -479,10 +496,12 @@ async function saveItem(e) {
   try {
     const fields = { ...state.itemFields, color: form.color.value.trim(), name: form.name.value.trim() };
     if (state.editingId) {
+      if (!state.seasonTouched) delete fields.season;   // 계절을 안 건드렸으면 '사용자 확인'으로 바꾸지 않는다
       await api(`/api/wardrobe/${state.editingId}`, { method: 'PATCH', body: fields });
     } else {
       const fd = new FormData();
       Object.entries(fields).forEach(([k, v]) => fd.append(k, v));
+      fd.append('season_by_user', state.seasonTouched);
       if (state.photoBlob) fd.append('photo', state.photoBlob, 'photo.jpg');
       await api('/api/wardrobe', { method: 'POST', form: fd });
     }
@@ -501,19 +520,21 @@ async function onBulkPicked(e) {
     try {
       const { blob, canvas } = await resizeImage(file);
       const fd = new FormData();
-      let category = '미분류', color = dominantColor(canvas);
+      let category = '미분류', color = dominantColor(canvas), name = '';
       if (state.photoTagging) {
         // 종류가 확실할 때(60% 이상)만 바로 분류하고, 아니면 미분류로 두어 사람이 고르게 한다
         try {
           const tags = await analyzePhoto(blob);
           if (tags.category.confidence >= 0.6) category = tags.category.value;
           color = tags.color.value;
+          if (category !== '미분류' && tags.name) name = tags.name.value;
           if (tags.season.confidence >= CONFIDENT) fd.append('season', tags.season.value);
           if (tags.style.confidence >= CONFIDENT) fd.append('style', tags.style.value);
         } catch { /* 분석 실패 시 미분류로 올린다 */ }
       }
       fd.append('category', category);
       fd.append('color', color);
+      if (name) fd.append('name', name);
       fd.append('photo', blob, 'photo.jpg');
       await api('/api/wardrobe', { method: 'POST', form: fd });
       ok++;
@@ -528,7 +549,7 @@ async function onBulkPicked(e) {
 // 사진 있는 옷을 지금의 분석 방식으로 모두 다시 분류 (분석 방식을 바꾼 뒤 예전에 올린 옷을 정리할 때)
 async function reanalyzeAll() {
   const targets = state.items.filter(i => i.photo_url);
-  if (!targets.length || !confirm(`사진이 있는 옷 ${targets.length}벌을 AI로 다시 분류할까요? 이름은 그대로 두고 종류·색·계절·스타일을 바꿔요.`)) return;
+  if (!targets.length || !confirm(`사진이 있는 옷 ${targets.length}벌을 AI로 다시 분류할까요? 이름과 직접 고른 계절은 그대로 두고 종류·색·스타일·계절을 바꿔요.`)) return;
   const btn = $('#reanalyzeAllBtn');
   btn.disabled = true;
   let done = 0, failed = 0;

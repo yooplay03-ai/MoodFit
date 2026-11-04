@@ -5,6 +5,7 @@
 DB에는 파일 이름만 남긴다. (예전 버전은 사진을 브라우저 localStorage에 넣어 5MB 한도에 금방 찼다)
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -16,19 +17,43 @@ from sqlalchemy.orm import Session
 from app import config
 from app.db import get_db
 from app.models import ClothingItem, User
-from app.schemas import Category, ItemOut, ItemUpdate, Season, Style, WearRequest
+from app.schemas import SEASON_CHECK_CATEGORIES, Category, ItemOut, ItemUpdate, Season, Style, WearRequest
 from app.security import get_current_user
 
 router = APIRouter(prefix="/api/wardrobe", tags=["옷장"])
+log = logging.getLogger("moodfit")
 
 ALLOWED_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 MAX_ITEMS = 200
 
 
+def cut_name(filename: str) -> str:
+    """배경을 지운 사진의 파일 이름 (원본 옆에 저장)"""
+    return f"{filename.rsplit('.', 1)[0]}_cut.jpg"
+
+
 def to_out(item: ClothingItem) -> ItemOut:
     out = ItemOut.model_validate(item)
-    out.photo_url = f"/media/{item.photo}" if item.photo else None
+    out.season_check = not item.season_by_user and item.category in SEASON_CHECK_CATEGORIES
+    if item.photo:
+        cut = cut_name(item.photo)
+        # 배경을 지운 사진이 있으면 화면에는 그걸 보여 준다
+        out.photo_url = f"/media/{cut}" if (config.MEDIA_DIR / cut).exists() else f"/media/{item.photo}"
     return out
+
+
+async def save_cutout(filename: str, data: bytes) -> None:
+    """배경 제거 사진을 만든다. rembg가 없거나 실패하면 조용히 건너뛴다 (원본 사진을 그대로 씀)."""
+    if not config.PHOTO_CUTOUT:
+        return
+    try:
+        from app.services import cutout
+        result = await run_in_threadpool(cutout.make_cutout, data)
+    except Exception as e:                   # 패키지 없음, 사진 손상 등 — 원본으로 충분하다
+        log.warning("배경 제거 실패: %s", e)
+        return
+    if result:
+        (config.MEDIA_DIR / cut_name(filename)).write_bytes(result)
 
 
 def get_own_item(item_id: int, user: User, db: Session) -> ClothingItem:
@@ -41,6 +66,7 @@ def get_own_item(item_id: int, user: User, db: Session) -> ClothingItem:
 def delete_photo(filename: str | None):
     if filename:
         (config.MEDIA_DIR / filename).unlink(missing_ok=True)
+        (config.MEDIA_DIR / cut_name(filename)).unlink(missing_ok=True)
 
 
 @router.get("", response_model=list[ItemOut])
@@ -54,6 +80,7 @@ def list_items(user: User = Depends(get_current_user), db: Session = Depends(get
 async def create_item(
     category: Category = Form(...),
     season: Season = Form("사계절"),
+    season_by_user: bool = Form(False),      # 화면에서 사용자가 계절을 직접 골랐는지
     style: Style = Form("캐주얼"),
     color: str = Form("", max_length=20),
     name: str = Form("", max_length=50),
@@ -76,8 +103,9 @@ async def create_item(
         config.MEDIA_DIR.mkdir(parents=True, exist_ok=True)
         filename = f"{uuid.uuid4().hex}{ext}"
         (config.MEDIA_DIR / filename).write_bytes(data)
+        await save_cutout(filename, data)
 
-    item = ClothingItem(user_id=user.id, category=category, season=season, style=style,
+    item = ClothingItem(user_id=user.id, category=category, season=season, season_by_user=season_by_user, style=style,
                         color=color.strip(), name=name.strip(), photo=filename)
     db.add(item)
     db.commit()
@@ -115,16 +143,23 @@ CONFIDENT_CATEGORY = 0.5
 @router.post("/{item_id}/reanalyze", response_model=ItemOut)
 async def reanalyze(item_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """이미 올린 옷을 지금의 분석 방식으로 다시 분류한다. 모델을 바꿔도 옷을 다시 올릴 필요가 없다.
-    종류는 확신할 때(50% 이상)만 바꾸고, 계절·스타일·색은 새 결과로 바꾼다. 이름은 그대로 둔다."""
+    종류는 확신할 때(50% 이상)만 바꾸고, 스타일·색은 새 결과로 바꾼다. 계절은 사용자가 직접 고른 적이 없을 때만 바꾼다.
+    이름은 비어 있을 때만 AI가 제안한 이름(예: "블랙 토트백")으로 채운다. 배경 제거 사진이 없으면 만든다."""
     item = get_own_item(item_id, user, db)
     if not item.photo or not (config.MEDIA_DIR / item.photo).exists():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "사진이 없는 옷은 다시 분석할 수 없어요.")
-    tags = await run_tagger((config.MEDIA_DIR / item.photo).read_bytes())
+    data = (config.MEDIA_DIR / item.photo).read_bytes()
+    tags = await run_tagger(data)
     if tags["category"]["confidence"] >= CONFIDENT_CATEGORY:
         item.category = tags["category"]["value"]
-    item.season = tags["season"]["value"]
+    if not item.season_by_user:
+        item.season = tags["season"]["value"]
     item.style = tags["style"]["value"]
     item.color = tags["color"]["value"]
+    if not item.name and tags.get("name"):
+        item.name = tags["name"]["value"][:50]
+    if not (config.MEDIA_DIR / cut_name(item.photo)).exists():
+        await save_cutout(item.photo, data)
     db.commit()
     return to_out(item)
 
@@ -134,6 +169,8 @@ def update_item(item_id: int, req: ItemUpdate, user: User = Depends(get_current_
     item = get_own_item(item_id, user, db)
     for key, value in req.model_dump(exclude_none=True).items():
         setattr(item, key, value.strip() if isinstance(value, str) else value)
+    if req.season is not None:
+        item.season_by_user = True
     db.commit()
     return to_out(item)
 

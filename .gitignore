@@ -17,5 +17,5 @@ claude_prompt.txt
 claude_results.txt
 
 # 개인 옷 사진 평가셋 (사진은 올리지 않음)
-eval_photos/
+eval_photos*/
 tagging_results.csv

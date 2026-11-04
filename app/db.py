@@ -4,7 +4,7 @@ db.py — SQLAlchemy로 DB 연결을 만든다.
 기본은 파일 하나로 동작하는 SQLite이고, DATABASE_URL만 바꾸면 PostgreSQL 등으로 옮길 수 있다.
 """
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app import config
@@ -25,3 +25,19 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# 나중에 추가한 열 — 이미 만든 DB 파일에도 넣어 준다 (create_all은 있는 테이블을 바꾸지 않는다)
+ADDED_COLUMNS = {"clothing_items": {"season_by_user": "BOOLEAN NOT NULL DEFAULT 0"}}
+
+
+def add_missing_columns():
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table, columns in ADDED_COLUMNS.items():
+            if not insp.has_table(table):
+                continue
+            existing = {c["name"] for c in insp.get_columns(table)}
+            for name, ddl in columns.items():
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))

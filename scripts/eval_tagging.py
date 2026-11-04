@@ -185,6 +185,10 @@ def main():
         allowed = {"style": {"캐주얼", "포멀", "스포티"}}   # 데이터셋 용도 라벨에 있는 3가지 안에서 비교
         for field in ("category", "season", "style", "color"):
             pred, conf = zero_shot(X, *banks[field], allowed=allowed.get(field))
+            if field == "category":
+                pred_category = pred
+            if field == "season":   # 앱과 똑같이: 가방·액세서리로 본 것은 사계절
+                pred = ["사계절" if c in tagger.SEASONLESS else p for p, c in zip(pred, pred_category)]
             acc, n = accuracy(pred, gold[field])
             rows.append({"data": source, "model": model_id, "field": field, "method": "zero-shot", "accuracy": round(acc, 3), "n": n})
             if field == "category":
@@ -192,6 +196,14 @@ def main():
                 acc_c, n_c = accuracy([pred[i] for i in confident], [gold[field][i] for i in confident])
                 rows.append({"data": source, "model": model_id, "field": field, "method": "zero-shot, 확신 60% 이상만",
                              "accuracy": round(acc_c, 3), "n": n_c})
+            if field == "season" and args.photos:   # 계절 정확도를 정답 종류별로 나눠 본다 (하의만 유난히 낮은지)
+                by_cat = defaultdict(lambda: [0, 0])
+                for g_cat, g, p in zip(gold["category"], gold["season"], pred):
+                    if g:
+                        key = g_cat.split("/")[0]
+                        by_cat[key][0] += p in g.split("/")
+                        by_cat[key][1] += 1
+                print("  season 종류별 정답:", ", ".join(f"{k} {a}/{n}" for k, (a, n) in by_cat.items()))
             if field in ("category", "color", "season"):
                 confusion = Counter((g, p) for g, p in zip(gold[field], pred) if g and p not in g.split("/"))
                 print(f"  {field} 자주 틀린 경우(정답 → 예측):", confusion.most_common(5))

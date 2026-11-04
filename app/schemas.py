@@ -11,6 +11,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 Category = Literal["상의", "하의", "아우터", "신발", "가방", "액세서리", "미분류"]
 Season = Literal["사계절", "봄", "여름", "가을", "겨울"]
+# 사진만으로 계절을 맞히기 어려운 종류 — 실제 사진 평가에서 하의는 8벌 중 4벌만 맞았다(상의·아우터는 13벌 중 12벌).
+# 치마·바지는 모양이 계절과 거의 상관없고 원단 두께가 사진에 잘 드러나지 않기 때문. 이 종류는 사용자에게 확인을 받는다.
+SEASON_CHECK_CATEGORIES = {"하의"}
 Style = Literal["캐주얼", "포멀", "스트릿", "미니멀", "빈티지", "스포티"]
 Mood = Literal["신남", "편안함", "진지함", "설렘", "피곤함", "자신감"]
 Occasion = Literal["출근", "데이트", "친구 약속", "면접", "외출", "운동", "여행", "집에서"]
@@ -71,6 +74,7 @@ class ItemOut(BaseModel):
     color: str
     name: str
     photo_url: str | None = None
+    season_check: bool = False           # AI가 추측한 계절이라 사용자 확인이 필요함
     last_worn_at: datetime | None = None
 
 
