@@ -6,11 +6,13 @@ tagger.py — 옷 사진을 보고 카테고리·계절·스타일·색상을 �
   문장 벡터들과 비교해(코사인 유사도) 가장 가까운 문장의 라벨을 고른다. 따로 학습하지 않아도 된다.
   한 라벨에 여러 문장을 두고 그 문장 벡터들의 평균을 라벨 벡터로 쓴다(프롬프트 앙상블).
   확률을 문장별로 더하면 문장이 많은 라벨이 유리해지므로, 평균 벡터로 라벨끼리 공정하게 비교한다.
-- 계절·스타일: 제로샷은 거의 찍는 수준(계절 31%, 스타일 56%)이라, CLIP 사진 벡터 위에 학습한
-  로지스틱 회귀(선형 분류기) 가중치가 app/data에 있으면 그걸 쓴다 (scripts/train_probe.py로 학습).
-- 색상: k-means 군집화
-  사진 가장자리 색을 배경으로 보고 빼낸 뒤, 남은 픽셀을 3개 색 무리로 묶어 가장 큰 무리를 옷 색으로 본다.
-  색 이름은 사람 눈의 색 차이에 가까운 Lab 색공간에서 가장 가까운 것을 고른다.
+- 스타일: 제로샷은 56%라, CLIP 사진 벡터 위에 학습한 로지스틱 회귀(app/data/probe_*.json)를 쓴다.
+- 계절: 상품 데이터의 계절 라벨(인도 쇼핑몰 기준)로 학습한 분류기는 실제 옷장 사진에서 대부분 '여름'으로
+  틀렸다. 그래서 라벨 대신 눈에 보이는 '두께·소재'(두꺼운 패딩/울 니트 ↔ 얇은 반팔)를 CLIP으로 고르고,
+  그걸 계절로 바꾼다. 가방·액세서리는 계절을 타지 않으므로 사계절로 둔다.
+- 색상: CLIP 제로샷 ("a photo of white clothing" …)
+  처음에는 k-means(가장자리를 배경으로 보고 빼낸 뒤 가장 큰 색 무리)를 썼지만, 실제 사진은 책상·벽·손·옷걸이가
+  함께 찍혀 배경 가정이 깨졌다. CLIP은 사진 속 옷에 주목하므로 배경에 덜 흔들린다. k-means는 비교·대체용으로 남겼다.
 
 torch·transformers가 없으면 이 기능만 꺼지고 서버는 그대로 동작한다 (requirements-ml.txt).
 """
@@ -43,12 +45,18 @@ CATEGORY_PROMPTS = {
     "가방": ["a handbag", "a backpack", "a tote bag", "a shoulder bag"],
     "액세서리": ["a cap", "a hat", "a belt", "a watch", "a scarf", "a pair of sunglasses", "a necklace"],
 }
-SEASON_PROMPTS = {
-    "여름": ["light summer clothing", "thin breathable clothing for hot weather"],
-    "겨울": ["warm winter clothing", "thick padded clothing for cold weather"],
-    "봄": ["light spring clothing"],
-    "가을": ["autumn clothing", "fall layering clothing"],
+# 계절은 '두께·소재'로 판단한다 (봄·가을은 추천 점수에서 같은 간절기로 취급하므로 '가을' 하나로 둔다)
+THICKNESS_PROMPTS = {
+    "겨울": ["a thick padded puffer jacket", "a heavy wool knit sweater", "a warm fleece jacket",
+            "a thick wool coat", "thick warm winter clothing"],
+    "가을": ["a light jacket", "a cotton sweatshirt", "a hoodie", "a cardigan", "a long-sleeve shirt",
+            "a pair of jeans", "a corduroy skirt"],
+    "여름": ["a thin short-sleeve t-shirt", "a sleeveless top", "a pair of shorts", "a thin linen shirt",
+            "light thin summer clothing"],
 }
+SEASONLESS = {"가방", "액세서리"}
+USE_PROBE = {"style"}        # 학습한 분류기를 쓰는 항목 (계절 분류기는 실제 사진에서 틀려 쓰지 않음)
+
 STYLE_PROMPTS = {
     "캐주얼": ["casual everyday clothing"],
     "포멀": ["formal business clothing", "office formal wear"],
@@ -63,7 +71,16 @@ PALETTE = {
     "브라운": (122, 84, 52), "네이비": (32, 42, 82), "블루": (64, 112, 200), "스카이블루": (150, 196, 232),
     "그린": (70, 130, 82), "카키": (132, 128, 84), "레드": (190, 52, 52), "핑크": (232, 156, 184),
     "옐로우": (230, 202, 62), "오렌지": (222, 132, 52), "퍼플": (122, 82, 162),
+    "아이보리": (238, 232, 212), "라벤더": (190, 170, 220), "민트": (160, 215, 195), "와인": (110, 32, 48),
+    "차콜": (62, 62, 66),
 }
+COLOR_EN = {
+    "화이트": "white", "블랙": "black", "그레이": "gray", "베이지": "beige", "브라운": "brown",
+    "네이비": "navy blue", "블루": "blue", "스카이블루": "light sky blue", "그린": "green", "카키": "khaki olive",
+    "레드": "red", "핑크": "pink", "옐로우": "yellow", "오렌지": "orange", "퍼플": "purple",
+    "아이보리": "ivory cream", "라벤더": "lavender", "민트": "mint", "와인": "burgundy wine", "차콜": "charcoal gray",
+}
+COLOR_PROMPTS = {ko: [f"{en} clothing", f"a {en} garment"] for ko, en in COLOR_EN.items()}
 
 
 class TaggerUnavailable(Exception):
@@ -173,7 +190,8 @@ def _load():
         return labels, torch.stack(vectors)
 
     text_banks = {name: encode_texts(m) for name, m in
-                  (("category", CATEGORY_PROMPTS), ("season", SEASON_PROMPTS), ("style", STYLE_PROMPTS))}
+                  (("category", CATEGORY_PROMPTS), ("season", THICKNESS_PROMPTS), ("style", STYLE_PROMPTS),
+                   ("color", COLOR_PROMPTS))}
     probes = load_probes(torch)
     log.info("CLIP 모델 준비 완료: %s (학습한 분류기: %s)", MODEL_ID, ", ".join(probes) or "없음")
     return torch, model, processor, text_banks, probes
@@ -186,7 +204,7 @@ def load_probes(torch) -> dict:
         return {}
     data = json.loads(path.read_text(encoding="utf-8"))
     return {field: (p["classes"], torch.tensor(p["coef"], dtype=torch.float32), torch.tensor(p["intercept"], dtype=torch.float32))
-            for field, p in data["fields"].items()}
+            for field, p in data["fields"].items() if field in USE_PROBE}
 
 
 def image_embedding(image: Image.Image):
@@ -218,7 +236,7 @@ def analyze(photo_bytes: bytes) -> dict:
     _, _, _, banks, probes = _load()
     emb = image_embedding(image)
     result = {}
-    for field in ("category", "season", "style"):
+    for field in ("category", "season", "style", "color"):
         if field in probes:
             label, conf, scores = classify_probe(emb, *probes[field])
             method = "linear-probe"
@@ -226,7 +244,8 @@ def analyze(photo_bytes: bytes) -> dict:
             label, conf, scores = classify(emb, *banks[field])
             method = "zero-shot"
         result[field] = {"value": label, "confidence": round(conf, 3), "scores": scores, "method": method}
-    color, share = dominant_color(image)
-    result["color"] = {"value": color, "confidence": round(share, 3)}
+    if result["category"]["value"] in SEASONLESS:
+        result["season"] = {"value": "사계절", "confidence": 1.0, "scores": {}, "method": "rule"}
+    kmeans_color, share = dominant_color(image)
+    result["color"]["kmeans"] = kmeans_color          # 비교용으로 함께 돌려준다
     return result
-

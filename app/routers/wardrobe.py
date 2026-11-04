@@ -92,6 +92,10 @@ async def analyze_photo(photo: UploadFile = File(...), user: User = Depends(get_
     data = await photo.read(config.MAX_PHOTO_BYTES + 1)
     if len(data) > config.MAX_PHOTO_BYTES:
         raise HTTPException(413, "사진은 2MB 이하만 올릴 수 있습니다.")
+    return await run_tagger(data)
+
+
+async def run_tagger(data: bytes) -> dict:
     unavailable = HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "사진 자동 분석이 설치되지 않았어요. 직접 골라 주세요.")
     try:
         from app.services import tagger      # numpy·Pillow가 없으면 ImportError
@@ -103,6 +107,26 @@ async def analyze_photo(photo: UploadFile = File(...), user: User = Depends(get_
         raise unavailable
     except OSError:                           # 사진 파일이 깨졌거나 이미지가 아님
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "사진을 읽지 못했어요. 다른 사진으로 시도해 주세요.")
+
+
+CONFIDENT_CATEGORY = 0.5
+
+
+@router.post("/{item_id}/reanalyze", response_model=ItemOut)
+async def reanalyze(item_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """이미 올린 옷을 지금의 분석 방식으로 다시 분류한다. 모델을 바꿔도 옷을 다시 올릴 필요가 없다.
+    종류는 확신할 때(50% 이상)만 바꾸고, 계절·스타일·색은 새 결과로 바꾼다. 이름은 그대로 둔다."""
+    item = get_own_item(item_id, user, db)
+    if not item.photo or not (config.MEDIA_DIR / item.photo).exists():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "사진이 없는 옷은 다시 분석할 수 없어요.")
+    tags = await run_tagger((config.MEDIA_DIR / item.photo).read_bytes())
+    if tags["category"]["confidence"] >= CONFIDENT_CATEGORY:
+        item.category = tags["category"]["value"]
+    item.season = tags["season"]["value"]
+    item.style = tags["style"]["value"]
+    item.color = tags["color"]["value"]
+    db.commit()
+    return to_out(item)
 
 
 @router.patch("/{item_id}", response_model=ItemOut)

@@ -335,6 +335,7 @@ function renderWardrobe() {
   }
   $('#itemGrid').innerHTML = shown.map(it => {
     const actions = `<div class="item-actions">
+      ${state.photoTagging && it.photo_url ? `<button class="icon-btn" data-reanalyze="${it.id}" title="AI 다시 분석" aria-label="AI 다시 분석">↻</button>` : ''}
       <button class="icon-btn" data-edit="${it.id}" title="수정" aria-label="수정">✎</button>
       <button class="icon-btn" data-del="${it.id}" title="삭제" aria-label="삭제">✕</button></div>`;
     const card = itemCard(it, { actions });
@@ -353,6 +354,9 @@ async function onGridClick(e) {
       await api(`/api/wardrobe/${t.dataset.del}`, { method: 'DELETE' });
     } else if (t.dataset.quick) {
       await api(`/api/wardrobe/${t.dataset.quick}`, { method: 'PATCH', body: { category: t.dataset.cat } });
+    } else if (t.dataset.reanalyze) {
+      t.textContent = '…'; t.disabled = true;
+      await api(`/api/wardrobe/${t.dataset.reanalyze}/reanalyze`, { method: 'POST' });
     } else if (t.dataset.edit) {
       openItemDialog(state.items.find(i => i.id === Number(t.dataset.edit)));
       return;
@@ -521,8 +525,26 @@ async function onBulkPicked(e) {
   if (ok < files.length) alert(`${files.length}장 중 ${ok}장을 올렸어요.`);
 }
 
+// 사진 있는 옷을 지금의 분석 방식으로 모두 다시 분류 (분석 방식을 바꾼 뒤 예전에 올린 옷을 정리할 때)
+async function reanalyzeAll() {
+  const targets = state.items.filter(i => i.photo_url);
+  if (!targets.length || !confirm(`사진이 있는 옷 ${targets.length}벌을 AI로 다시 분류할까요? 이름은 그대로 두고 종류·색·계절·스타일을 바꿔요.`)) return;
+  const btn = $('#reanalyzeAllBtn');
+  btn.disabled = true;
+  let done = 0, failed = 0;
+  for (const it of targets) {
+    btn.textContent = `다시 분석 중… ${done + failed}/${targets.length}`;
+    try { await api(`/api/wardrobe/${it.id}/reanalyze`, { method: 'POST' }); done++; } catch { failed++; }
+  }
+  btn.disabled = false;
+  btn.textContent = '↻ 모두 다시 분석';
+  await loadItems();
+  if (failed) alert(`${targets.length}벌 중 ${failed}벌은 다시 분석하지 못했어요.`);
+}
+
 function setupWardrobe() {
   $('#itemGrid').onclick = onGridClick;
+  $('#reanalyzeAllBtn').onclick = reanalyzeAll;
   $('#addItemBtn').onclick = () => openItemDialog();
   $('#photoInput').onchange = onPhotoPicked;
   $('#itemForm').onsubmit = saveItem;
@@ -560,7 +582,11 @@ async function init() {
   setupAuth(); setupWeather(); setupToday(); setupWardrobe();
   $$('.tab').forEach(t => t.onclick = () => showTab(t.dataset.tab));
   $('#profileForm').onsubmit = saveProfile;
-  api('/api/health').then(h => { state.photoTagging = h.photo_tagging; }).catch(() => {});
+  api('/api/health').then(h => {
+    state.photoTagging = h.photo_tagging;
+    $('#reanalyzeAllBtn').hidden = !h.photo_tagging;
+    if (state.user) renderWardrobe();
+  }).catch(() => {});
 
   const saved = storage('get');
   if (!saved) return showAuth();

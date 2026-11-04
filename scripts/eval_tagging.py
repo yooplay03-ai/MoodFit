@@ -7,7 +7,8 @@ eval_tagging.py — 옷 사진 자동 분류가 얼마나 맞는지 잰다.
 비교:
   A. 제로샷 — CLIP 모델 2개 (일반 CLIP, 패션 사진으로 더 학습된 FashionCLIP)
   B. 선형 분류기 — CLIP 사진 벡터 위에 로지스틱 회귀를 학습 (5-fold 교차검증)
-  C. 색상 — 사진 평균색 vs k-means(RGB 거리) vs k-means(Lab 거리 + 흰 옷 보정)
+  C. 색상 — 사진 평균색 vs k-means(RGB 거리) vs k-means(Lab 거리 + 흰 옷 보정) vs CLIP 제로샷
+  D. 계절 — '두께·소재' 제로샷 (--photos로 실제 사진에서 확인. 데이터셋의 계절 라벨은 기준이 달라 참고용)
 선택: --photos 폴더에 내 옷 사진과 labels.csv를 넣으면, 실제 휴대폰 사진에서도 같은 평가를 한다.
 
 실행 (Colab GPU 권장):
@@ -129,8 +130,11 @@ def zero_shot(img_emb, labels, label_emb, allowed=None):
 
 
 def accuracy(pred, gold):
+    """정답이 "봄/가을"처럼 여러 개면 그중 하나만 맞혀도 정답으로 센다."""
     pairs = [(p, g) for p, g in zip(pred, gold) if g]
-    return sum(p == g for p, g in pairs) / len(pairs), len(pairs)
+    if not pairs:
+        return 0.0, 0
+    return sum(p in g.split("/") for p, g in pairs) / len(pairs), len(pairs)
 
 
 def linear_probe(X, y, seed):
@@ -154,6 +158,7 @@ def main():
     ap.add_argument("--per-class", type=int, default=150)
     ap.add_argument("--photos", type=Path, help="내 옷 사진 폴더 (labels.csv 포함)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--models", nargs="+", default=MODELS)
     args = ap.parse_args()
 
     samples = load_my_photos(args.photos) if args.photos else load_dataset_sample(args.per_class, args.seed)
@@ -169,14 +174,16 @@ def main():
         pred = [fn(s["image"]) for s in samples]
         acc, n = accuracy(pred, gold["color"])
         rows.append({"data": source, "model": "-", "field": "color", "method": method, "accuracy": round(acc, 3), "n": n})
-        wrong = Counter((g, p) for g, p in zip(gold["color"], pred) if g and g != p)
+        wrong = Counter((g, p) for g, p in zip(gold["color"], pred) if g and p not in g.split("/"))
         print(f"색상 [{method}] 자주 틀린 경우(정답 → 예측):", wrong.most_common(6))
+        if args.photos:
+            print("    " + ", ".join(f"{s_['name']}: {p_}" for s_, p_ in zip(samples, pred)))
 
-    for model_id in MODELS:
+    for model_id in args.models:
         X, banks, ms = embed_all(samples, model_id)
         print(f"\n[{model_id}] 사진 1장당 {ms:.1f}ms")
         allowed = {"style": {"캐주얼", "포멀", "스포티"}}   # 데이터셋 용도 라벨에 있는 3가지 안에서 비교
-        for field in ("category", "season", "style"):
+        for field in ("category", "season", "style", "color"):
             pred, conf = zero_shot(X, *banks[field], allowed=allowed.get(field))
             acc, n = accuracy(pred, gold[field])
             rows.append({"data": source, "model": model_id, "field": field, "method": "zero-shot", "accuracy": round(acc, 3), "n": n})
@@ -185,9 +192,13 @@ def main():
                 acc_c, n_c = accuracy([pred[i] for i in confident], [gold[field][i] for i in confident])
                 rows.append({"data": source, "model": model_id, "field": field, "method": "zero-shot, 확신 60% 이상만",
                              "accuracy": round(acc_c, 3), "n": n_c})
-                confusion = Counter((g, p) for g, p in zip(gold[field], pred) if g and g != p)
-                print("  자주 틀린 경우(정답 → 예측):", confusion.most_common(5))
-            if not args.photos:
+            if field in ("category", "color", "season"):
+                confusion = Counter((g, p) for g, p in zip(gold[field], pred) if g and p not in g.split("/"))
+                print(f"  {field} 자주 틀린 경우(정답 → 예측):", confusion.most_common(5))
+            if args.photos:
+                for s_, p_ in zip(samples, pred):
+                    print(f"    {s_['name']}: {field} 예측 {p_} / 정답 {s_[field] or '-'}")
+            if not args.photos and field != "color":
                 probe = linear_probe(X.numpy(), gold[field], args.seed)
                 if probe is not None:
                     rows.append({"data": source, "model": model_id, "field": field, "method": "linear probe (5-fold)",

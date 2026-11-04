@@ -15,3 +15,7 @@ media/
 # 예전 작업 메모
 claude_prompt.txt
 claude_results.txt
+
+# 개인 옷 사진 평가셋 (사진은 올리지 않음)
+eval_photos/
+tagging_results.csv

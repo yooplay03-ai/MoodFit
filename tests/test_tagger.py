@@ -55,3 +55,26 @@ def test_analyze_rejects_broken_file(client):
     r = client.post("/api/wardrobe/analyze", headers=headers, files={"photo": ("c.jpg", b"not an image", "image/jpeg")})
     assert r.status_code == 400            # 모델을 불러오기 전에 사진부터 연다
     assert client.post("/api/wardrobe/analyze", files={"photo": ("c.jpg", jpeg((0, 0, 0)), "image/jpeg")}).status_code == 401
+
+
+def test_reanalyze_updates_saved_item(client, monkeypatch):
+    from app.services import tagger
+    tags = {"category": {"value": "아우터", "confidence": 0.9}, "season": {"value": "겨울", "confidence": 0.7},
+            "style": {"value": "캐주얼", "confidence": 0.8}, "color": {"value": "스카이블루", "confidence": 0.6}}
+    monkeypatch.setattr(tagger, "analyze", lambda data: tags)
+    headers = signup(client)
+    item = client.post("/api/wardrobe", headers=headers, data={"category": "미분류", "season": "여름", "color": "화이트"},
+                       files={"photo": ("p.jpg", jpeg((150, 196, 232)), "image/jpeg")}).json()
+    r = client.post(f"/api/wardrobe/{item['id']}/reanalyze", headers=headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert (body["category"], body["season"], body["color"]) == ("아우터", "겨울", "스카이블루")
+
+    # 종류를 확신하지 못하면 종류는 그대로 둔다
+    tags["category"] = {"value": "상의", "confidence": 0.3}
+    assert client.post(f"/api/wardrobe/{item['id']}/reanalyze", headers=headers).json()["category"] == "아우터"
+
+    no_photo = client.post("/api/wardrobe", headers=headers, data={"category": "상의"}).json()
+    assert client.post(f"/api/wardrobe/{no_photo['id']}/reanalyze", headers=headers).status_code == 400
+    other = signup(client, email="other@example.com")
+    assert client.post(f"/api/wardrobe/{item['id']}/reanalyze", headers=other).status_code == 404
