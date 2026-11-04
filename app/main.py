@@ -43,7 +43,12 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/api/health", tags=["상태"])
 def health():
-    return {"status": "ok", "llm": bool(config.GROQ_API_KEY), "weather": bool(config.KMA_API_KEY)}
+    try:
+        from app.services import tagger
+        tagging = tagger.installed()
+    except ImportError:
+        tagging = False
+    return {"status": "ok", "llm": bool(config.GROQ_API_KEY), "weather": bool(config.KMA_API_KEY), "photo_tagging": tagging}
 
 
 @app.get("/", include_in_schema=False)

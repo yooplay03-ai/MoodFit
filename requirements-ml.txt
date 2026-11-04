@@ -1,0 +1,6 @@
+# 사진 자동 분류(선택). 없어도 서버는 동작하고, 이 기능만 꺼진다.
+# CPU만 있는 컴퓨터: pip install torch --index-url https://download.pytorch.org/whl/cpu 를 먼저 하면 용량이 작다.
+torch>=2.2
+transformers>=4.40
+pillow>=10.0
+numpy>=1.26

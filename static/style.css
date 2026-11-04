@@ -137,3 +137,8 @@ dialog .row input { flex: 1; }
   .item-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   .item-actions { opacity: 1; }
 }
+
+/* 사진 없는 옷 그림 */
+.item-photo .cloth { width: 68%; height: 68%; }
+.tag-status { margin: 0; color: var(--accent-strong); }
+.tag-status:empty { display: none; }

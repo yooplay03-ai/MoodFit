@@ -15,7 +15,6 @@ const OPTIONS = {
   personal_color: ['모름', '봄 웜톤', '여름 쿨톤', '가을 웜톤', '겨울 쿨톤'],
 };
 const MOOD_EMOJI = { 신남: '😆', 편안함: '😌', 진지함: '🧐', 설렘: '🥰', 피곤함: '😪', 자신감: '😎' };
-const CATEGORY_EMOJI = { 상의: '👕', 하의: '👖', 아우터: '🧥', 신발: '👟', 가방: '👜', 액세서리: '💍', 미분류: '🏷' };
 const SLOT_LABEL = { top: '상의', bottom: '하의', outer: '아우터', shoes: '신발', accessory: '액세서리' };
 const DEMO = { email: 'demo@moodfit.app', password: 'moodfit-demo' };
 
@@ -190,11 +189,58 @@ function setupWeather() {
   };
 }
 
+// ── 사진 없는 옷: 종류 모양 그림을 그 옷의 색으로 칠해 보여 준다 ─────────────
+// 쇼핑몰 사진은 저작권 때문에 쓰지 않고, 사진은 사용자가 올린 것만 쓴다.
+const CLOTH_SHAPES = {
+  상의: '<path d="M31 17 L43 11 Q50 19 57 11 L69 17 L87 33 L77 44 L70 38 L70 87 L30 87 L30 38 L23 44 L13 33 Z"/>' +
+        '<path d="M43 11 Q50 19 57 11" fill="none"/>',
+  하의: '<path d="M29 12 L71 12 L75 89 L56 89 L50 38 L44 89 L25 89 Z"/><path d="M29 20 L71 20" fill="none"/>',
+  아우터: '<path d="M31 13 L43 9 L50 25 L57 9 L69 13 L85 29 L84 82 L74 82 L72 44 L72 91 L28 91 L28 44 L26 82 L16 82 L15 29 Z"/>' +
+          '<path d="M43 9 L50 25 L57 9 M50 25 L50 91" fill="none"/><circle cx="50" cy="45" r="1.6"/><circle cx="50" cy="60" r="1.6"/><circle cx="50" cy="75" r="1.6"/>',
+  신발: '<path d="M12 60 Q12 45 25 43 L39 41 Q47 53 61 55 L83 59 Q91 61 91 69 L91 72 L12 72 Z"/>' +
+        '<path d="M12 72 L91 72 L91 78 Q91 80 89 80 L14 80 Q12 80 12 78 Z" data-sole/>',
+  가방: '<path d="M37 40 Q37 18 50 18 Q63 18 63 40" fill="none" stroke-width="3.5"/><path d="M22 40 L78 40 L84 86 L16 86 Z"/>',
+  액세서리: '<path d="M21 63 Q21 33 50 33 Q79 33 79 63 Z"/><path d="M14 63 L86 63 Q86 70 50 70 Q14 70 14 63 Z"/>',
+  긴팔상의: '<path d="M31 17 L43 11 Q50 19 57 11 L69 17 L84 30 L88 80 L78 81 L71 40 L70 87 L30 87 L29 40 L22 81 L12 80 L16 30 Z"/>' +
+            '<path d="M43 11 Q50 19 57 11" fill="none"/>',
+  반바지: '<path d="M27 22 L73 22 L78 70 L56 72 L50 46 L44 72 L22 70 Z"/><path d="M27 30 L73 30" fill="none"/>',
+  미분류: '<path d="M18 30 L56 30 L82 50 L56 70 L18 70 Z"/><circle cx="30" cy="50" r="4" data-sole/>',
+};
+const COLOR_ALIAS = { 아이보리: [240, 234, 214], 크림: [240, 230, 205], 차콜: [62, 62, 66], 연청: [150, 182, 212],
+  진청: [42, 62, 110], 데님: [70, 100, 150], 와인: [110, 32, 48], 버건디: [110, 32, 48], 민트: [150, 215, 190],
+  올리브: [110, 115, 60], 라벤더: [190, 170, 220], 실버: [192, 192, 196], 골드: [205, 170, 90] };
+
+function colorRgb(name) {
+  const key = (name || '').replace(/\s/g, '');
+  // '스카이블루'가 '블루'로 잡히지 않게 긴 이름부터 비교한다
+  const all = [...PALETTE.map(([n, r, g, b]) => [n, [r, g, b]]), ...Object.entries(COLOR_ALIAS)]
+    .sort((a, b) => b[0].length - a[0].length);
+  const hit = all.find(([n]) => key.includes(n));
+  return hit ? hit[1] : null;
+}
+
+function clothSvg(item) {
+  const rgb = colorRgb(item.color);
+  const [r, g, b] = rgb || [214, 206, 192];
+  const shade = k => `rgb(${Math.round(r * k)},${Math.round(g * k)},${Math.round(b * k)})`;
+  const light = 0.299 * r + 0.587 * g + 0.114 * b > 200;        // 흰색 계열은 테두리를 진하게
+  const stroke = light ? 'rgb(170,164,150)' : shade(0.7);
+  const sole = light ? 'rgb(225,220,210)' : 'rgb(245,243,238)';
+  const name = item.name || '';
+  let kind = item.category;
+  if (kind === '상의' && /셔츠|니트|맨투맨|후드|긴팔|가디건|블라우스/.test(name) && !/반팔/.test(name)) kind = '긴팔상의';
+  if (kind === '하의' && /쇼츠|반바지|숏/.test(name)) kind = '반바지';
+  const shape = (CLOTH_SHAPES[kind] || CLOTH_SHAPES['미분류']).replace(/data-sole/g, `fill="${sole}"`);
+  return `<svg class="cloth" viewBox="0 0 100 100" role="img" aria-label="${esc((item.color || '') + ' ' + item.category)}"
+    fill="${rgb ? shade(1) : 'none'}" stroke="${rgb ? stroke : 'rgb(170,164,150)'}" stroke-width="2.2"
+    stroke-linejoin="round" stroke-linecap="round"${rgb ? '' : ' stroke-dasharray="4 3"'}>${shape}</svg>`;
+}
+
 // ── 추천 ───────────────────────────────────────────────
 function itemCard(item, { label, actions = '' } = {}) {
   const photo = item.photo_url
     ? `<img src="${esc(item.photo_url)}" alt="${esc(item.name || item.category)}" loading="lazy">`
-    : CATEGORY_EMOJI[item.category] || '👚';
+    : clothSvg(item);
   const sub = [item.color, item.season, item.style].filter(Boolean).join(' · ');
   return `<div class="item">
     <div class="item-photo">${photo}</div>
@@ -282,7 +328,7 @@ function renderWardrobe() {
 
   const shown = state.filter === '전체' ? items : items.filter(i => i.category === state.filter);
   if (shown.length === 0) {
-    $('#itemGrid').innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">👕</div>
+    $('#itemGrid').innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">✦</div>
       <p>${items.length ? '이 카테고리에는 옷이 없어요.' : '아직 등록된 옷이 없어요.'}</p>
       <p class="small">사진을 올리면 색상은 자동으로 채워져요.</p></div>`;
     return;
@@ -365,6 +411,7 @@ function openItemDialog(item = null) {
   $('#photoDrop').hidden = !!item;                     // 사진 교체는 삭제 후 다시 등록
   $('#photoPreview').hidden = true;
   $('#photoText').hidden = false;
+  $('#tagStatus').textContent = state.photoTagging && !item ? '사진을 올리면 AI가 종류·색·계절·스타일을 채워 드려요.' : '';
   const cats = item?.category === '미분류' ? [...OPTIONS.category, '미분류'] : OPTIONS.category;
   [['category', cats], ['season', OPTIONS.season], ['style', OPTIONS.style]].forEach(([key, values]) =>
     renderChips(form.querySelector(`[data-item="${key}"]`), values,
@@ -383,7 +430,41 @@ async function onPhotoPicked(e) {
     $('#photoPreview').hidden = false;
     $('#photoText').hidden = true;
     if (!form.color.value) form.color.value = dominantColor(canvas);
+    if (state.photoTagging) await autoTag(blob);
   } catch (err) { form.querySelector('[data-error]').textContent = err.message; }
+}
+
+// ── 사진 자동 분석 (서버의 CLIP 모델) ───────────────────
+const CONFIDENT = 0.5;      // 이 확률 이상이면 바로 채우고, 아니면 '확인 필요'로 표시
+
+async function analyzePhoto(blob) {
+  const fd = new FormData();
+  fd.append('photo', blob, 'photo.jpg');
+  return api('/api/wardrobe/analyze', { method: 'POST', form: fd });
+}
+
+async function autoTag(blob) {
+  const status = $('#tagStatus');
+  status.textContent = 'AI가 사진을 분석하는 중…';
+  try {
+    const tags = await analyzePhoto(blob);
+    const form = $('#itemForm');
+    const notes = [];
+    for (const key of ['category', 'season', 'style']) {
+      const { value, confidence } = tags[key];
+      if (key === 'category' && confidence < CONFIDENT) { notes.push(`종류는 확실하지 않아요(${value}?)`); continue; }
+      state.itemFields[key] = value;
+      renderChips(form.querySelector(`[data-item="${key}"]`), key === 'category' ? OPTIONS.category : OPTIONS[key],
+        { selected: () => state.itemFields[key], onChange: v => state.itemFields[key] = v });
+      if (key !== 'category' && confidence < CONFIDENT) notes.push(`${value}`);
+    }
+    form.color.value = tags.color.value;
+    const pct = Math.round(tags.category.confidence * 100);
+    status.textContent = `✦ AI가 채웠어요 — ${tags.category.value} ${pct}% · ${tags.color.value}` +
+      (notes.length ? ` · 확인 필요: ${notes.join(', ')}` : '') + '. 틀린 곳만 고쳐 주세요.';
+  } catch (err) {
+    status.textContent = err.message.includes('설치') ? '' : `자동 분석 실패: ${err.message}`;
+  }
 }
 
 async function saveItem(e) {
@@ -416,15 +497,27 @@ async function onBulkPicked(e) {
     try {
       const { blob, canvas } = await resizeImage(file);
       const fd = new FormData();
-      fd.append('category', '미분류');
-      fd.append('color', dominantColor(canvas));
+      let category = '미분류', color = dominantColor(canvas);
+      if (state.photoTagging) {
+        // 종류가 확실할 때(60% 이상)만 바로 분류하고, 아니면 미분류로 두어 사람이 고르게 한다
+        try {
+          const tags = await analyzePhoto(blob);
+          if (tags.category.confidence >= 0.6) category = tags.category.value;
+          color = tags.color.value;
+          if (tags.season.confidence >= CONFIDENT) fd.append('season', tags.season.value);
+          if (tags.style.confidence >= CONFIDENT) fd.append('style', tags.style.value);
+        } catch { /* 분석 실패 시 미분류로 올린다 */ }
+      }
+      fd.append('category', category);
+      fd.append('color', color);
       fd.append('photo', blob, 'photo.jpg');
       await api('/api/wardrobe', { method: 'POST', form: fd });
       ok++;
     } catch { /* 실패한 사진은 건너뛴다 */ }
   }
-  state.filter = '미분류';
   await loadItems();
+  state.filter = state.items.some(i => i.category === '미분류') ? '미분류' : '전체';
+  renderWardrobe();
   if (ok < files.length) alert(`${files.length}장 중 ${ok}장을 올렸어요.`);
 }
 
@@ -467,6 +560,7 @@ async function init() {
   setupAuth(); setupWeather(); setupToday(); setupWardrobe();
   $$('.tab').forEach(t => t.onclick = () => showTab(t.dataset.tab));
   $('#profileForm').onsubmit = saveProfile;
+  api('/api/health').then(h => { state.photoTagging = h.photo_tagging; }).catch(() => {});
 
   const saved = storage('get');
   if (!saved) return showAuth();

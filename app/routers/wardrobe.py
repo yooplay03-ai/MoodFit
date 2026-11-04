@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -81,6 +82,27 @@ async def create_item(
     db.add(item)
     db.commit()
     return to_out(item)
+
+
+@router.post("/analyze")
+async def analyze_photo(photo: UploadFile = File(...), user: User = Depends(get_current_user)):
+    """사진을 저장하지 않고 분석만 한다. 화면은 결과로 입력칸을 미리 채우고, 사용자가 확인한 뒤 저장한다."""
+    if (photo.content_type or "") not in ALLOWED_TYPES:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "JPG, PNG, WEBP 사진만 분석할 수 있습니다.")
+    data = await photo.read(config.MAX_PHOTO_BYTES + 1)
+    if len(data) > config.MAX_PHOTO_BYTES:
+        raise HTTPException(413, "사진은 2MB 이하만 올릴 수 있습니다.")
+    unavailable = HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "사진 자동 분석이 설치되지 않았어요. 직접 골라 주세요.")
+    try:
+        from app.services import tagger      # numpy·Pillow가 없으면 ImportError
+    except ImportError:
+        raise unavailable
+    try:
+        return await run_in_threadpool(tagger.analyze, data)   # 무거운 계산은 별도 스레드에서
+    except tagger.TaggerUnavailable:          # torch·transformers가 없음
+        raise unavailable
+    except OSError:                           # 사진 파일이 깨졌거나 이미지가 아님
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "사진을 읽지 못했어요. 다른 사진으로 시도해 주세요.")
 
 
 @router.patch("/{item_id}", response_model=ItemOut)
