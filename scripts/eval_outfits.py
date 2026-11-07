@@ -10,7 +10,7 @@ eval_outfits.py — 추천 점수가 사람의 평가(좋아요/별로)와 맞�
 비교하는 것
   - 전체 점수 (지금 앱이 쓰는 가중치)
   - 항목 하나씩만 쓴 경우 / 항목 하나씩 뺀 경우  → 어떤 항목이 실제로 도움이 되는지
-  - 평가로 가중치를 학습한 경우 (로지스틱 회귀, leave-one-out) → 가중치를 내 취향에 맞추면 얼마나 나아지는지
+  - 평가로 가중치를 학습한 경우 (로지스틱 회귀, 반복 층화 교차검증) → 가중치를 내 취향에 맞추면 얼마나 나아지는지
 
 실행:  python scripts/eval_outfits.py            (기본 moodfit.db, 모든 사용자)
        python scripts/eval_outfits.py --email 내이메일
@@ -55,14 +55,24 @@ def fit_logistic(X, y, l2=1.0, steps=2000, lr=0.1):
     return w, b
 
 
-def loo_auc(X, y) -> float:
-    """한 개씩 빼고 나머지로 학습해 그 하나를 예측 → 학습에 쓴 데이터로 점수를 매기는 착시를 막는다"""
-    preds = []
-    for i in range(len(y)):
-        mask = np.arange(len(y)) != i
-        w, b = fit_logistic(X[mask], y[mask])
-        preds.append(float(X[i] @ w + b))
-    return auc(preds, y)
+def cv_auc(X, y, folds: int = 3, repeats: int = 30, seed: int = 0) -> float:
+    """반복 층화 k-겹 교차검증: 좋아요/별로 비율을 유지한 채 나눠, 학습에 안 쓴 평가로만 AUC를 재고 평균낸다.
+    처음엔 leave-one-out을 썼는데, 평가가 수십 개이고 좋아요가 적으면 하나를 뺄 때마다 절편이 반대로 움직여
+    AUC가 0.09처럼 비정상적으로 낮게 나왔다(LOO의 알려진 편향). 그래서 폴드마다 AUC를 재는 방식으로 바꿨다."""
+    rng = np.random.default_rng(seed)
+    pos, neg = np.where(y > 0)[0], np.where(y < 0)[0]
+    scores = []
+    for _ in range(repeats):
+        p_split = np.array_split(rng.permutation(pos), folds)
+        n_split = np.array_split(rng.permutation(neg), folds)
+        for k in range(folds):
+            test = np.concatenate([p_split[k], n_split[k]])
+            train = np.setdiff1d(np.arange(len(y)), test)
+            w, b = fit_logistic(X[train], y[train])
+            a = auc(list(X[test] @ w + b), list(y[test]))
+            if a == a:                                   # nan(한쪽 라벨만 있는 폴드)은 건너뜀
+                scores.append(a)
+    return float(np.mean(scores))
 
 
 def main():
@@ -120,7 +130,7 @@ def main():
         w = weights.copy()
         w[i] = 0
         rows_out.append((f"{engine.COMPONENT_LABEL[k]} 빼고", auc(X @ w, y)))
-    rows_out.append(("평가로 가중치 학습 (leave-one-out)", loo_auc(X, y)))
+    rows_out.append(("평가로 가중치 학습 (3겹 교차검증 × 30번 평균)", cv_auc(X, y)))
 
     print("| 방법 | AUC |\n|---|---|")
     for name, v in rows_out:

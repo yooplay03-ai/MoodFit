@@ -414,35 +414,11 @@
   ]
  },
  "leather-jacket": {
-  "photo": {
-   "id": 4536550,
-   "url": "https://pixabay.com/photos/love-woman-man-romantic-go-stroll-4536550/",
-   "photographer": "birgl",
-   "photographer_url": "https://pixabay.com/users/birgl-6508325/",
-   "src": "https://pixabay.com/get/g44067270ad9009ac1f6594148289105cfde97aab35e814e0e8690d0079424cb481b99ea08008cc86143439de41b4d9300254cea5071282acf4d18a2dcdf9a508_1280.jpg",
-   "source": "Pixabay"
-  },
-  "checks": {
-   "product": 0.943,
-   "person": 0.121,
-   "category": 0.846,
-   "colors": [
-    "블랙",
-    "네이비"
-   ]
-  },
-  "occasion_fit": {
-   "친구 약속": 0.472,
-   "데이트": 0.243,
-   "출근": 0.138,
-   "외출": 0.107,
-   "면접": 0.032,
-   "여행": 0.006,
-   "운동": 0.001,
-   "집에서": 0.001
-  },
+  "photo": null,
+  "rejected": "상품 사진 아님 17, 사람이 찍힘 11, 중복·제외 2",
   "banned": [
    2911327,
+   4536550,
    4536550
   ]
  },
