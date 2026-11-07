@@ -7,7 +7,7 @@ clothing_items   옷장 아이템 (회원 1명 : 옷 N벌)
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, DateTime
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -44,12 +44,33 @@ class ClothingItem(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     category: Mapped[str] = mapped_column(String(10))           # 상의/하의/아우터/신발/가방/액세서리/미분류
     season: Mapped[str] = mapped_column(String(10), default="사계절")
+    source: Mapped[str | None] = mapped_column(String(40), nullable=True)   # None=직접 올림, "link", "catalog:<id>"
+    category_by_user: Mapped[bool] = mapped_column(Boolean, default=False)  # 사용자가 직접 고친 종류는 AI가 덮어쓰지 않는다
     season_by_user: Mapped[bool] = mapped_column(Boolean, default=False)   # 사용자가 직접 고른 계절이면 AI가 덮어쓰지 않는다
     style: Mapped[str] = mapped_column(String(10), default="캐주얼")
     color: Mapped[str] = mapped_column(String(20), default="")
     name: Mapped[str] = mapped_column(String(50), default="")
     photo: Mapped[str | None] = mapped_column(String(100), nullable=True)   # media 폴더 안의 파일 이름
+    # FashionCLIP이 사진을 보고 계산한 상황별 적합도 JSON {"출근": 0.31, "데이트": 0.12, …}. 사진·모델이 없으면 None
+    occasion_fit: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_worn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     owner: Mapped[User] = relationship(back_populates="items")
+
+
+class OutfitFeedback(Base):
+    """코디 평가 (좋아요 1 / 별로 -1). 추천 점수가 사람의 평가와 맞는지 재는 데 쓴다 (scripts/eval_outfits.py)."""
+    __tablename__ = "outfit_feedback"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    item_ids: Mapped[str] = mapped_column(String(200))          # JSON {"top": 3, "bottom": 7, …}
+    temp: Mapped[float] = mapped_column(Float)
+    occasions: Mapped[str] = mapped_column(String(100), default="")   # 쉼표로 구분
+    mood: Mapped[str] = mapped_column(String(10))
+    style: Mapped[str] = mapped_column(String(10))
+    source: Mapped[str] = mapped_column(String(10))             # "model"(추천 결과) 또는 "random"(평가용 무작위)
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)   # 평가 당시 모델 점수
+    rating: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

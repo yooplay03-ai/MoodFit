@@ -14,15 +14,20 @@ const OPTIONS = {
   skin_tone: ['밝음', '중간', '어두움'],
   personal_color: ['모름', '봄 웜톤', '여름 쿨톤', '가을 웜톤', '겨울 쿨톤'],
 };
-const MOOD_EMOJI = { 신남: '😆', 편안함: '😌', 진지함: '🧐', 설렘: '🥰', 피곤함: '😪', 자신감: '😎' };
+const MOOD_EMOJI = {};
 const SLOT_LABEL = { top: '상의', bottom: '하의', outer: '아우터', shoes: '신발', accessory: '액세서리' };
+// 옷장 진열 순서: 종류는 겉에서 안으로, 같은 종류 안에서는 밝은 색 → 어두운 색
+const SHELF_ORDER = ['아우터', '상의', '하의', '신발', '가방', '액세서리', '미분류'];
+const COLOR_ORDER = ['화이트', '아이보리', '베이지', '옐로우', '민트', '스카이블루', '라벤더', '핑크', '오렌지', '레드',
+  '그린', '카키', '블루', '그레이', '브라운', '퍼플', '와인', '네이비', '차콜', '블랙'];
+const colorRank = c => { const i = COLOR_ORDER.indexOf(c); return i < 0 ? COLOR_ORDER.length : i; };
 const DEMO = { email: 'demo@moodfit.app', password: 'moodfit-demo' };
 
 const state = {
   token: null, user: null, items: [], filter: '전체',
   weather: null,                       // 서버에서 받은 날씨 (없으면 직접 입력값 사용)
   mood: '편안함', occasions: new Set(['출근']), style: '캐주얼',
-  lastPicks: [], editingId: null, photoBlob: null, itemFields: {},
+  outfits: [], current: 0, request: null, evalOutfit: null, editingId: null, photoBlob: null, itemFields: {},
 };
 
 // ── 공통 ───────────────────────────────────────────────
@@ -96,6 +101,7 @@ async function enterApp(token, user) {
   $('#nickname').textContent = `${user.nickname}님`;
   fillProfile();
   await loadItems();
+  autoStart();
 }
 
 function logout() {
@@ -144,23 +150,38 @@ function showTab(name) {
 function showWeather(w) {
   state.weather = w;
   $('#wTemp').textContent = Math.round(w.temp);
-  $('#wDesc').textContent = `${w.place ? w.place + ' · ' : ''}${w.desc}`;
-  const feels = w.feels_like != null && w.feels_like !== w.temp ? ` · 체감 ${w.feels_like}°C` : '';
-  const rain = w.rain_prob != null ? ` · 강수확률 ${w.rain_prob}%` : '';
-  const src = w.source ? ` · 출처 ${w.source}` : '';
-  $('#wMeta').textContent = `습도 ${w.humidity}%${feels}${rain}${src}`;
+  $('#wDesc').textContent = `${w.place ? w.place + ', ' : ''}${w.desc}`;
+  const feels = w.feels_like != null && w.feels_like !== w.temp ? `, 체감 ${w.feels_like}°` : '';
+  const rain = w.rain_prob != null ? `, 비 올 확률 ${w.rain_prob}%` : '';
+  $('#wMeta').textContent = `습도 ${w.humidity}%${feels}${rain}`;
+  $('#wSrc').textContent = w.source ? `날씨 정보: ${w.source}` : '';
   $('#weatherMsg').textContent = '';
   $('#manualWeather').open = false;
 }
 
 async function loadWeather(query) {
   $('#weatherMsg').textContent = '날씨를 불러오는 중…';
-  try { showWeather(await api(`/api/weather?${query}`)); }
-  catch (e) {
+  try {
+    showWeather(await api(`/api/weather?${query}`));
+    try { localStorage.setItem('moodfit_place', query); } catch {}   // 다음에 열 때 같은 곳 날씨를 바로
+    return true;
+  } catch (e) {
     $('#weatherMsg').textContent = e.message;
     $('#manualWeather').open = true;
     state.weather = null;
+    return false;
   }
+}
+
+// 앱을 열면 지난번 위치(없으면 서울) 날씨를 불러오고, 옷장에 상의·하의가 있으면 기본 조건으로 바로 첫 추천을 보여 준다.
+// "열자마자 오늘 뭐 입을지 보이는 것"이 이 앱의 핵심이라, 버튼을 누르기 전 빈 화면을 없앴다.
+async function autoStart() {
+  let place = null;
+  try { place = localStorage.getItem('moodfit_place'); } catch {}
+  await loadWeather(place || `city=${encodeURIComponent('서울')}`);
+  if (!place && state.weather) $('#weatherMsg').textContent = '서울 날씨예요. 위에서 도시를 검색하거나 현재 위치를 누르면 바뀌어요.';
+  const has = c => state.items.some(i => i.category === c);
+  if (has('상의') && has('하의')) recommend();
 }
 
 function currentWeather() {
@@ -243,46 +264,76 @@ function itemCard(item, { label, actions = '' } = {}) {
     ? `<img src="${esc(item.photo_url)}" alt="${esc(item.name || item.category)}" loading="lazy">`
     : clothSvg(item);
   // 제목: 이름(예: "블랙 토트백")이 있으면 이름, 없으면 종류. 추천 결과에서는 칸 이름(상의·하의…)을 앞에 붙인다.
-  const title = label ? (item.name ? `${label} · ${item.name}` : label) : (item.name || item.category);
+  const title = label ? (item.name || label) : (item.name || item.category);
   const season = item.season_check ? `${item.season}?` : item.season;   // ?: AI 추측, 아직 확인 안 함
-  const sub = [item.name ? item.category : item.color, season, item.style].filter(Boolean).join(' · ');
+  const sub = [item.name ? item.category : item.color, season, item.style].filter(Boolean).join(' / ');
+  const tag = item.source?.startsWith('catalog:') ? '<span class="photo-tag">예시 사진</span>' : '';
   return `<div class="item">
-    <div class="item-photo">${photo}</div>
+    <div class="item-photo">${photo}${tag}</div>
     ${actions}
     <div class="item-info"><b>${esc(title)}</b><span class="muted">${esc(sub)}</span></div>
   </div>`;
+}
+
+// 추천 결과: 고른 옷들을 한 장의 코디 보드(룩북처럼 옷만 놓은 화면)로 보여 준다
+function outfitBoard(picks) {
+  const piece = p => {
+    const it = p.item;
+    const img = it.photo_url ? `<img src="${esc(it.photo_url)}" alt="${esc(it.name || it.category)}">` : clothSvg(it);
+    const label = p.slot === 'accessory' ? it.category : SLOT_LABEL[p.slot];
+    return `<figure class="piece piece-${p.slot}">${img}<figcaption><span>${esc(label)}</span>${esc(it.name || it.color || '')}</figcaption></figure>`;
+  };
+  const by = Object.fromEntries(picks.map(p => [p.slot, p]));
+  const main = ['top', 'bottom'].filter(s => by[s]).map(s => piece(by[s])).join('');
+  const side = ['outer', 'accessory', 'shoes'].filter(s => by[s]).map(s => piece(by[s])).join('');
+  return `<div class="board-main">${main}</div>${side ? `<div class="board-side">${side}</div>` : ''}`;
 }
 
 function setResult(mode) {
   $('#resultEmpty').hidden = mode !== 'empty';
   $('#resultLoading').hidden = mode !== 'loading';
   $('#resultBody').hidden = mode !== 'body';
+  $('#evalBody').hidden = mode !== 'eval';
+}
+
+function conditions() {
+  return { weather: currentWeather(), mood: state.mood, occasions: [...state.occasions], style: state.style };
+}
+
+const BAR_LABEL = { weather: '날씨', occasion: '상황', color: '색 조합', fresh: '새로움', style: '기분·스타일' };
+
+function showOutfit(n) {
+  state.current = n;
+  const o = state.outfits[n];
+  $$('#outfitTabs button').forEach((b, i) => b.classList.toggle('active', i === n));
+  $('#pickGrid').innerHTML = outfitBoard(o.picks);
+  $('#answerText').innerHTML = o.comment ? formatAnswer(o.comment) : '';
+  $('#reasonList').innerHTML = o.reasons.map(r => `<li>${esc(r)}</li>`).join('');
+  $('#scoreBars').innerHTML = Object.entries(BAR_LABEL).map(([k, label]) =>
+    `<div class="bar"><span>${label}</span><i style="--v:${o.breakdown[k] ?? 0}%"></i><b>${o.breakdown[k] ?? 0}</b></div>`).join('');
+  $('#wearBtn').disabled = false;
+  $$('.rate-btn').forEach(b => { b.disabled = false; });
+  $('#wearMsg').textContent = '';
 }
 
 async function recommend() {
   const btn = $('#recommendBtn');
   $('#resultError').textContent = '';
-  $('#wearMsg').textContent = '';
   btn.disabled = true;
   setResult('loading');
   if (window.innerWidth <= 820) $('#resultCard').scrollIntoView({ behavior: 'smooth' });
   try {
-    const data = await api('/api/recommend', {
-      method: 'POST',
-      body: { weather: currentWeather(), mood: state.mood, occasions: [...state.occasions], style: state.style },
-    });
-    state.lastPicks = data.picks;
-    $('#pickGrid').innerHTML = data.picks.map(p => itemCard(p.item, { label: p.slot === 'accessory' ? p.item.category : SLOT_LABEL[p.slot] })).join('');
-    $('#pickGrid').hidden = data.picks.length === 0;
-    $('#answerText').innerHTML = formatAnswer(data.text);
-    const byId = Object.fromEntries(state.items.map(i => [i.id, i]));
-    $('#candidateList').innerHTML = data.candidates.map(c => {
-      const it = byId[c.item_id];
-      return it ? `<li>${esc(it.category)} 1순위: ${esc(it.name || it.color || '이름 없음')} — ${c.score}점 (${esc(c.reason)})</li>` : '';
-    }).join('');
-    $('.why').hidden = !data.used_wardrobe;
-    $('#wearBtn').hidden = data.picks.length === 0;
-    $('#wearBtn').disabled = false;
+    state.request = conditions();
+    const data = await api('/api/recommend', { method: 'POST', body: state.request });
+    state.outfits = data.outfits;
+    const has = data.outfits.length > 0;
+    $('#outfitTabs').innerHTML = data.outfits.map((o, i) => `<button type="button" data-tab="${i}">추천 ${i + 1}<span>${o.score}</span></button>`).join('');
+    $('#outfitTabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) showOutfit(Number(b.dataset.tab)); };
+    ['#pickGrid', '#reasonList', '#whyBox', '#wearBtn'].forEach(s => { $(s).hidden = !has; });
+    $$('.rate-btn').forEach(b => { b.hidden = !has; });
+    if (has) showOutfit(0);
+    else { $('#answerText').innerHTML = formatAnswer(data.text); $('#wearMsg').textContent = '옷장에 상의·하의를 등록하면 내 옷으로 코디를 만들어 드려요.'; }
+    if (has && !data.llm_used) $('#wearMsg').textContent = 'AI 설명은 받지 못했지만, 점수로 고른 코디와 이유는 위와 같아요.';
     setResult('body');
   } catch (e) {
     setResult('empty');
@@ -290,13 +341,55 @@ async function recommend() {
   } finally { btn.disabled = false; }
 }
 
+function idsOf(picks) { return Object.fromEntries(picks.map(p => [p.slot, p.item.id])); }
+
+async function sendFeedback(picks, rating, source) {
+  const res = await api('/api/recommend/feedback', {
+    method: 'POST', body: { ...(state.request || conditions()), item_ids: idsOf(picks), rating, source } });
+  return res.count;
+}
+
+async function rateCurrent(e) {
+  const b = e.target.closest('.rate-btn');
+  if (!b) return;
+  try {
+    const count = await sendFeedback(state.outfits[state.current].picks, Number(b.dataset.rate), 'model');
+    $$('.rate-btn').forEach(x => { x.disabled = true; });
+    $('#wearMsg').textContent = `평가를 저장했어요. 지금까지 ${count}개.`;
+  } catch (err) { $('#wearMsg').textContent = err.message; }
+}
+
 async function wearToday() {
   try {
-    await api('/api/wardrobe/wear', { method: 'POST', body: { item_ids: state.lastPicks.map(p => p.item.id) } });
+    await api('/api/wardrobe/wear', { method: 'POST', body: { item_ids: state.outfits[state.current].picks.map(p => p.item.id) } });
     $('#wearMsg').textContent = '오늘의 코디로 기록했어요. 다음 추천에서는 방금 입은 옷이 덜 나와요.';
     $('#wearBtn').disabled = true;
     await loadItems();
   } catch (e) { $('#wearMsg').textContent = e.message; }
+}
+
+// 평가 모드: 점수와 무관한 무작위 코디에 좋아요/별로 → 추천 점수가 취향과 맞는지 치우침 없이 잴 수 있다
+async function nextEvalOutfit() {
+  $('#evalMsg').textContent = '';
+  try {
+    state.request = conditions();
+    const { outfit } = await api('/api/recommend/sample', { method: 'POST', body: state.request });
+    if (!outfit) { $('#evalMsg').textContent = '옷장에 상의와 하의가 있어야 평가할 수 있어요.'; $('#evalBoard').innerHTML = ''; return; }
+    state.evalOutfit = outfit;
+    $('#evalBoard').innerHTML = outfitBoard(outfit.picks);   // 점수는 보여 주지 않는다 (평가가 점수에 끌려가지 않게)
+  } catch (e) { $('#evalMsg').textContent = e.message; }
+}
+
+async function rateEval(e) {
+  const b = e.target.closest('[data-eval]');
+  if (!b || !state.evalOutfit) return;
+  b.disabled = true;
+  try {
+    const count = await sendFeedback(state.evalOutfit.picks, Number(b.dataset.eval), 'random');
+    await nextEvalOutfit();
+    $('#evalMsg').textContent = `${count}개 평가했어요. 30개쯤 모이면 정확도를 잴 수 있어요.`;
+  } catch (err) { $('#evalMsg').textContent = err.message; }
+  finally { b.disabled = false; }
 }
 
 function setupToday() {
@@ -306,6 +399,10 @@ function setupToday() {
   $('#recommendBtn').onclick = recommend;
   $('#againBtn').onclick = recommend;
   $('#wearBtn').onclick = wearToday;
+  $('#resultBody').addEventListener('click', rateCurrent);
+  $('#evalBtn').onclick = () => { setResult('eval'); nextEvalOutfit(); if (window.innerWidth <= 820) $('#resultCard').scrollIntoView({ behavior: 'smooth' }); };
+  $('#evalBody').addEventListener('click', rateEval);
+  $('#evalStopBtn').onclick = () => setResult('empty');
 }
 
 // ── 옷장 ───────────────────────────────────────────────
@@ -324,11 +421,11 @@ function renderWardrobe() {
 
   const unclassified = items.filter(i => i.category === '미분류').length;
   $('#unclassifiedHint').hidden = unclassified === 0;
-  $('#unclassifiedHint').textContent = `🏷 미분류 ${unclassified}벌 — 카드의 카테고리 버튼을 한 번 눌러 정리해 주세요. 정리 전에는 추천에 쓰지 않아요.`;
+  $('#unclassifiedHint').textContent = `종류를 정하지 않은 옷이 ${unclassified}벌 있어요. 사진 아래에서 종류를 고르면 추천에 쓸 수 있어요.`;
 
   const toCheck = items.filter(i => i.season_check).length;
   $('#seasonHint').hidden = toCheck === 0;
-  $('#seasonHint').textContent = `👖 하의 ${toCheck}벌은 계절을 한 번 골라 주세요. 바지·치마는 사진만으로 원단 두께를 알기 어려워 AI가 자주 틀려요. 고른 계절은 다시 분석해도 바뀌지 않아요.`;
+  $('#seasonHint').textContent = `하의 ${toCheck}벌은 계절을 직접 골라 주세요. 바지와 치마는 사진으로 원단 두께를 알기 어려워 AI가 자주 틀립니다.`;
 
   const filters = ['전체', ...OPTIONS.category, ...(unclassified ? ['미분류'] : [])];
   if (!filters.includes(state.filter)) state.filter = '전체';
@@ -336,26 +433,35 @@ function renderWardrobe() {
 
   const shown = state.filter === '전체' ? items : items.filter(i => i.category === state.filter);
   if (shown.length === 0) {
-    $('#itemGrid').innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">✦</div>
-      <p>${items.length ? '이 카테고리에는 옷이 없어요.' : '아직 등록된 옷이 없어요.'}</p>
-      <p class="small">사진을 올리면 색상은 자동으로 채워져요.</p></div>`;
+    $('#itemGrid').innerHTML = `<div class="empty">
+      <p class="empty-title">${items.length ? '이 종류에는 옷이 없어요' : '옷장이 비어 있어요'}</p>
+      <p class="small muted">${items.length ? '' : '가진 옷과 비슷한 기본 옷을 골라 30초 만에 시작하거나, 상품 링크나 사진으로 하나씩 넣을 수 있어요.'}</p>
+      ${items.length ? '' : '<button class="btn btn-primary" type="button" onclick="openCatalog()">기본 옷으로 채우기</button>'}</div>`;
     return;
   }
-  $('#itemGrid').innerHTML = shown.map(it => {
+  const card = it => {
     const actions = `<div class="item-actions">
-      ${state.photoTagging && it.photo_url ? `<button class="icon-btn" data-reanalyze="${it.id}" title="AI 다시 분석" aria-label="AI 다시 분석">↻</button>` : ''}
-      <button class="icon-btn" data-edit="${it.id}" title="수정" aria-label="수정">✎</button>
-      <button class="icon-btn" data-del="${it.id}" title="삭제" aria-label="삭제">✕</button></div>`;
-    const card = itemCard(it, { actions });
+      ${state.photoTagging && it.photo_url ? `<button class="icon-btn" data-reanalyze="${it.id}" title="AI 다시 분석" aria-label="AI 다시 분석">분석</button>` : ''}
+      <button class="icon-btn" data-edit="${it.id}" title="수정" aria-label="수정">수정</button>
+      <button class="icon-btn" data-del="${it.id}" title="삭제" aria-label="삭제">삭제</button></div>`;
+    const html = itemCard(it, { actions });
     let quick = '';
     if (it.category === '미분류') {
       quick = `<div class="quick-cat">${OPTIONS.category.map(c => `<button type="button" data-quick="${it.id}" data-cat="${c}">${c}</button>`).join('')}</div>`;
-    } else if (it.season_check) {   // AI가 추측한 계절은 점선으로 표시하고, 하나를 누르면 확정
-      quick = `<div class="quick-cat quick-season" title="계절을 골라 주세요">${OPTIONS.season.map(s =>
-        `<button type="button" data-season-of="${it.id}" data-season="${s}"${s === it.season ? ' class="guess"' : ''}>${s}</button>`).join('')}</div>`;
+    } else if (it.season_check) {   // AI가 추측한 계절 → 한 번 고르면 확정
+      quick = `<select class="season-pick" data-season-of="${it.id}" aria-label="계절 확인">
+        <option value="" selected disabled>계절 확인하기</option>
+        ${OPTIONS.season.map(s => `<option value="${s}">${s}</option>`).join('')}</select>`;
     }
-    return quick ? card.replace('<div class="item-info">', quick + '<div class="item-info">') : card;
-  }).join('');
+    return quick ? html.replace(/<\/div>\s*<\/div>$/, `${quick}</div></div>`) : html;
+  };
+  // 종류별 선반으로 나누고, 선반 안에서는 밝은 색부터 어두운 색 순서로 놓는다
+  const shelves = SHELF_ORDER.map(cat => [cat, shown.filter(i => i.category === cat)
+    .sort((a, b) => colorRank(a.color) - colorRank(b.color) || a.id - b.id)]).filter(([, list]) => list.length);
+  $('#itemGrid').innerHTML = shelves.map(([cat, list]) => `<section class="shelf">
+      <h3 class="shelf-title">${esc(cat)} <span>${list.length}</span></h3>
+      <div class="item-grid">${list.map(card).join('')}</div>
+    </section>`).join('');
 }
 
 async function onGridClick(e) {
@@ -367,8 +473,6 @@ async function onGridClick(e) {
       await api(`/api/wardrobe/${t.dataset.del}`, { method: 'DELETE' });
     } else if (t.dataset.quick) {
       await api(`/api/wardrobe/${t.dataset.quick}`, { method: 'PATCH', body: { category: t.dataset.cat } });
-    } else if (t.dataset.seasonOf) {
-      await api(`/api/wardrobe/${t.dataset.seasonOf}`, { method: 'PATCH', body: { season: t.dataset.season } });
     } else if (t.dataset.reanalyze) {
       t.textContent = '…'; t.disabled = true;
       await api(`/api/wardrobe/${t.dataset.reanalyze}/reanalyze`, { method: 'POST' });
@@ -420,7 +524,9 @@ function dominantColor(canvas) {
 function openItemDialog(item = null) {
   state.editingId = item ? item.id : null;
   state.photoBlob = null;
+  state.photoSource = 'upload';
   state.seasonTouched = false;          // 사용자가 계절을 직접 눌렀는지 (안 눌렀으면 AI 추측으로 저장)
+  state.categoryTouched = false;
   state.itemFields = { category: item?.category ?? '상의', season: item?.season ?? '사계절', style: item?.style ?? '캐주얼' };
   const form = $('#itemForm');
   form.reset();
@@ -429,14 +535,42 @@ function openItemDialog(item = null) {
   form.name.value = item?.name ?? '';
   $('#itemDialogTitle').textContent = item ? '옷 정보 수정' : '옷 추가';
   $('#photoDrop').hidden = !!item;                     // 사진 교체는 삭제 후 다시 등록
+  $('#linkRow').hidden = !!item;
+  $('#linkUrl').value = '';
   $('#photoPreview').hidden = true;
   $('#photoText').hidden = false;
-  $('#tagStatus').textContent = state.photoTagging && !item ? '사진을 올리면 AI가 종류·색·계절·스타일을 채워 드려요.' : '';
+  $('#tagStatus').textContent = state.photoTagging && !item ? '사진을 올리면 AI가 종류, 색, 계절, 스타일을 채웁니다.' : '';
   const cats = item?.category === '미분류' ? [...OPTIONS.category, '미분류'] : OPTIONS.category;
   [['category', cats], ['season', OPTIONS.season], ['style', OPTIONS.style]].forEach(([key, values]) =>
     renderChips(form.querySelector(`[data-item="${key}"]`), values,
-      { selected: () => state.itemFields[key], onChange: v => { state.itemFields[key] = v; if (key === 'season') state.seasonTouched = true; } }));
+      { selected: () => state.itemFields[key], onChange: v => { state.itemFields[key] = v; if (key === 'season') state.seasonTouched = true; if (key === 'category') state.categoryTouched = true; } }));
   $('#itemDialog').showModal();
+}
+
+// 상품 링크 → 서버가 그 페이지의 대표 사진·상품명을 읽어 옴 → 같은 AI 자동 채우기
+async function importLink() {
+  const form = $('#itemForm');
+  const url = $('#linkUrl').value.trim();
+  if (!url) return;
+  const btn = $('#linkBtn');
+  btn.disabled = true;
+  form.querySelector('[data-error]').textContent = '';
+  $('#tagStatus').textContent = '상품 페이지에서 사진을 가져오는 중…';
+  try {
+    const found = await api('/api/wardrobe/import-link', { method: 'POST', body: { url } });
+    const blob = await (await fetch(found.image)).blob();
+    state.photoBlob = blob;
+    state.photoSource = 'link';
+    $('#photoPreview').src = found.image;
+    $('#photoPreview').hidden = false;
+    $('#photoText').hidden = true;
+    form.name.value = found.title;
+    if (state.photoTagging) await autoTag(blob);
+    else $('#tagStatus').textContent = '사진을 가져왔어요. 종류와 계절을 골라 주세요.';
+  } catch (err) {
+    $('#tagStatus').textContent = '';
+    form.querySelector('[data-error]').textContent = err.message;
+  } finally { btn.disabled = false; }
 }
 
 async function onPhotoPicked(e) {
@@ -446,6 +580,7 @@ async function onPhotoPicked(e) {
   try {
     const { blob, canvas } = await resizeImage(file);
     state.photoBlob = blob;
+    state.photoSource = 'upload';
     $('#photoPreview').src = URL.createObjectURL(blob);
     $('#photoPreview').hidden = false;
     $('#photoText').hidden = true;
@@ -475,15 +610,15 @@ async function autoTag(blob) {
       if (key === 'category' && confidence < CONFIDENT) { notes.push(`종류는 확실하지 않아요(${value}?)`); continue; }
       state.itemFields[key] = value;
       renderChips(form.querySelector(`[data-item="${key}"]`), key === 'category' ? OPTIONS.category : OPTIONS[key],
-        { selected: () => state.itemFields[key], onChange: v => { state.itemFields[key] = v; if (key === 'season') state.seasonTouched = true; } });
+        { selected: () => state.itemFields[key], onChange: v => { state.itemFields[key] = v; if (key === 'season') state.seasonTouched = true; if (key === 'category') state.categoryTouched = true; } });
       if (key === 'season' && tags.season.needs_check) notes.push(`계절(하의는 사진으로 두께를 알기 어려워요)`);
       else if (key !== 'category' && confidence < CONFIDENT) notes.push(`${value}`);
     }
     form.color.value = tags.color.value;
     if (tags.name && !form.name.value) form.name.value = tags.name.value;
     const pct = Math.round(tags.category.confidence * 100);
-    status.textContent = `✦ AI가 채웠어요 — ${tags.category.value} ${pct}% · ${tags.color.value}` +
-      (notes.length ? ` · 확인 필요: ${notes.join(', ')}` : '') + '. 틀린 곳만 고쳐 주세요.';
+    status.textContent = `AI가 채웠어요: ${tags.category.value}(${pct}%), ${tags.color.value}.` +
+      (notes.length ? ` 확인이 필요해요: ${notes.join(', ')}.` : '') + ' 틀린 곳만 고치세요.';
   } catch (err) {
     status.textContent = err.message.includes('설치') ? '' : `자동 분석 실패: ${err.message}`;
   }
@@ -497,12 +632,15 @@ async function saveItem(e) {
   try {
     const fields = { ...state.itemFields, color: form.color.value.trim(), name: form.name.value.trim() };
     if (state.editingId) {
-      if (!state.seasonTouched) delete fields.season;   // 계절을 안 건드렸으면 '사용자 확인'으로 바꾸지 않는다
+      if (!state.seasonTouched) delete fields.season;   // 안 건드린 값은 보내지 않는다 → '사용자가 고침'으로 기록되지 않게
+      if (!state.categoryTouched) delete fields.category;
       await api(`/api/wardrobe/${state.editingId}`, { method: 'PATCH', body: fields });
     } else {
       const fd = new FormData();
       Object.entries(fields).forEach(([k, v]) => fd.append(k, v));
       fd.append('season_by_user', state.seasonTouched);
+      fd.append('category_by_user', state.categoryTouched);
+      fd.append('source', state.photoSource);
       if (state.photoBlob) fd.append('photo', state.photoBlob, 'photo.jpg');
       await api('/api/wardrobe', { method: 'POST', form: fd });
     }
@@ -550,7 +688,7 @@ async function onBulkPicked(e) {
 // 사진 있는 옷을 지금의 분석 방식으로 모두 다시 분류 (분석 방식을 바꾼 뒤 예전에 올린 옷을 정리할 때)
 async function reanalyzeAll() {
   const targets = state.items.filter(i => i.photo_url);
-  if (!targets.length || !confirm(`사진이 있는 옷 ${targets.length}벌을 AI로 다시 분류할까요? 이름과 직접 고른 계절은 그대로 두고 종류·색·스타일·계절을 바꿔요.`)) return;
+  if (!targets.length || !confirm(`사진이 있는 옷 ${targets.length}벌을 AI로 다시 분류할까요? 이름과 직접 고친 종류·계절은 그대로 두고 나머지를 AI 결과로 바꿔요.`)) return;
   const btn = $('#reanalyzeAllBtn');
   btn.disabled = true;
   let done = 0, failed = 0;
@@ -559,15 +697,90 @@ async function reanalyzeAll() {
     try { await api(`/api/wardrobe/${it.id}/reanalyze`, { method: 'POST' }); done++; } catch { failed++; }
   }
   btn.disabled = false;
-  btn.textContent = '↻ 모두 다시 분석';
+  btn.textContent = '모두 다시 분석';
   await loadItems();
   if (failed) alert(`${targets.length}벌 중 ${failed}벌은 다시 분석하지 못했어요.`);
 }
 
+// 기본 옷 카탈로그 — 가진 옷과 비슷한 걸 눌러 옷장을 한 번에 채운다
+async function openCatalog() {
+  state.catalogPicked = new Set();
+  const body = $('#catalogBody');
+  body.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  $('#catalogDialog').showModal();
+  try {
+    state.catalog = state.catalog || await api('/api/wardrobe/catalog');
+  } catch (err) { body.innerHTML = `<p class="form-error">${esc(err.message)}</p>`; return; }
+  if (!state.catalog.length) {
+    body.innerHTML = '<p class="empty-title">아직 기본 옷 사진이 없어요</p><p class="small muted">서버 폴더에서 <code>python scripts/build_catalog.py</code>를 한 번 실행하면 만들어져요.</p>';
+    return;
+  }
+  const owned = new Set(state.items.filter(i => i.source?.startsWith('catalog:')).map(i => i.source.slice(8)));
+  body.innerHTML = SHELF_ORDER.map(cat => {
+    const list = state.catalog.filter(c => c.category === cat);
+    if (!list.length) return '';
+    return `<section class="shelf"><h3 class="shelf-title">${esc(cat)}</h3><div class="item-grid catalog-grid">${list.map(c => `
+      <button type="button" class="catalog-tile" data-cat-id="${esc(c.id)}" ${owned.has(c.id) ? 'disabled' : ''}
+        title="${c.image_url ? `사진: ${esc(c.photographer)} (${esc(c.source)})` : '그림'}">
+        <span class="item-photo">${c.image_url ? `<img src="${esc(c.image_url)}" alt="${esc(c.name)}" loading="lazy">` : clothSvg(c)}</span>
+        <span class="catalog-name">${esc(c.name)}</span>
+        <span class="small muted">${owned.has(c.id) ? '옷장에 있음' : esc(c.season)}</span>
+      </button>`).join('')}</div></section>`;
+  }).join('');
+  const SOURCE_URL = { Pixabay: 'https://pixabay.com', Pexels: 'https://www.pexels.com' };
+  const sources = [...new Set(state.catalog.map(c => c.source).filter(Boolean))];
+  $('#catalogCredit').innerHTML = sources.length ? '사진 제공 ' + sources.map(s =>
+    `<a href="${SOURCE_URL[s] || '#'}" target="_blank" rel="noopener">${esc(s)}</a>`).join(', ') +
+    '. 작가 이름은 사진에 마우스를 올리면 보여요. 기준에 맞는 사진이 없는 옷은 그림으로 보여 줘요.' : '';
+  updateCatalogCount();
+}
+
+function updateCatalogCount() {
+  const n = state.catalogPicked.size;
+  $('#catalogCount').textContent = `${n}벌 선택`;
+  $('#catalogAddBtn').disabled = n === 0;
+}
+
+function onCatalogClick(e) {
+  const tile = e.target.closest('.catalog-tile');
+  if (!tile || tile.disabled) return;
+  const id = tile.dataset.catId;
+  if (state.catalogPicked.has(id)) state.catalogPicked.delete(id); else state.catalogPicked.add(id);
+  tile.classList.toggle('picked', state.catalogPicked.has(id));
+  tile.setAttribute('aria-pressed', state.catalogPicked.has(id));
+  updateCatalogCount();
+}
+
+async function addCatalogPicks() {
+  const btn = $('#catalogAddBtn');
+  btn.disabled = true;
+  btn.textContent = '넣는 중…';
+  try {
+    await api('/api/wardrobe/from-catalog', { method: 'POST', body: { ids: [...state.catalogPicked] } });
+    $('#catalogDialog').close();
+    await loadItems();
+  } catch (err) { alert(err.message); }
+  finally { btn.textContent = '옷장에 넣기'; updateCatalogCount(); }
+}
+
 function setupWardrobe() {
   $('#itemGrid').onclick = onGridClick;
+  $('#itemGrid').onchange = async e => {
+    const sel = e.target.closest('select[data-season-of]');
+    if (!sel) return;
+    try {
+      await api(`/api/wardrobe/${sel.dataset.seasonOf}`, { method: 'PATCH', body: { season: sel.value } });
+      await loadItems();
+    } catch (err) { alert(err.message); }
+  };
   $('#reanalyzeAllBtn').onclick = reanalyzeAll;
   $('#addItemBtn').onclick = () => openItemDialog();
+  $('#catalogBtn').onclick = openCatalog;
+  $('#catalogBody').onclick = onCatalogClick;
+  $('#catalogAddBtn').onclick = addCatalogPicks;
+  $('#catalogCloseBtn').onclick = () => $('#catalogDialog').close();
+  $('#linkBtn').onclick = importLink;
+  $('#linkUrl').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); importLink(); } };
   $('#photoInput').onchange = onPhotoPicked;
   $('#itemForm').onsubmit = saveItem;
   $('#itemCancelBtn').onclick = () => $('#itemDialog').close();

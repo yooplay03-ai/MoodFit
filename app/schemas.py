@@ -75,6 +75,7 @@ class ItemOut(BaseModel):
     name: str
     photo_url: str | None = None
     season_check: bool = False           # AI가 추측한 계절이라 사용자 확인이 필요함
+    source: str | None = None            # None=직접 올린 사진, "link"=상품 링크, "catalog:<id>"=기본 옷 예시 사진
     last_worn_at: datetime | None = None
 
 
@@ -104,14 +105,58 @@ class Pick(BaseModel):
     item: ItemOut
 
 
-class Candidate(BaseModel):
-    item_id: int
-    score: int
-    reason: str
+class OutfitOut(BaseModel):
+    picks: list[Pick]
+    score: int                      # 0~100
+    breakdown: dict[str, int]       # 항목별 0~100 (날씨·상황·색 조합·기분 스타일·새로움)
+    reasons: list[str]              # 규칙이 만든 이유 (LLM 없이도 보여 줄 수 있음)
+    comment: str = ""               # LLM이 쓴 설명
 
 
 class RecommendResponse(BaseModel):
-    text: str                       # LLM이 쓴 추천 이유와 스타일링 팁
-    picks: list[Pick]               # 옷장에서 고른 아이템 (옷장이 비었으면 빈 목록)
-    candidates: list[Candidate]     # 규칙 점수로 미리 고른 카테고리별 1순위 (LLM에 ★로 전달)
+    text: str                       # 옷장이 비었을 때 LLM의 일반 코디 조언, 옷장이 있으면 짧은 총평
+    outfits: list[OutfitOut]        # 점수 상위 코디 (최대 3개)
+    picks: list[Pick]               # outfits[0]의 옷 (이전 화면과의 호환용)
     used_wardrobe: bool
+    llm_used: bool                  # LLM 설명을 받았는지 (키가 없거나 실패하면 규칙 이유만)
+
+
+class FeedbackRequest(BaseModel):
+    item_ids: dict[Literal["top", "bottom", "outer", "shoes", "accessory"], int]
+    weather: Weather
+    mood: Mood = "편안함"
+    occasions: list[Occasion] = Field(default_factory=list, max_length=4)
+    style: Style = "캐주얼"
+    source: Literal["model", "random"] = "model"
+    rating: Literal[1, -1]
+
+
+class SampleResponse(BaseModel):
+    outfit: OutfitOut | None        # 평가용 무작위 코디 (상의·하의가 없으면 None)
+
+
+class CatalogItem(BaseModel):
+    id: str
+    name: str
+    category: str
+    color: str
+    season: str
+    style: str
+    image_url: str | None           # 품질 기준을 통과한 사진이 없으면 None → 화면에서 옷 그림
+    photographer: str | None = None
+    photographer_url: str | None = None
+    photo_page: str | None = None
+    source: str | None = None       # 사진 출처 (Pixabay, Pexels)
+
+
+class CatalogAddRequest(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=60)
+
+
+class LinkImportRequest(BaseModel):
+    url: str = Field(min_length=8, max_length=1000)
+
+
+class LinkImportResponse(BaseModel):
+    title: str
+    image: str                      # data:image/jpeg;base64,… (화면에서 바로 미리보기·분석에 씀)

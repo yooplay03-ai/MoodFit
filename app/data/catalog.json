@@ -1,0 +1,697 @@
+{
+ "white-tee": {
+  "photo": {
+   "id": 1886013,
+   "url": "https://pixabay.com/photos/blank-tshirt-male-fashion-top-1886013/",
+   "photographer": "nattyjeff",
+   "photographer_url": "https://pixabay.com/users/nattyjeff-1836617/",
+   "src": "https://pixabay.com/get/g48c9170529b32e519efedce44fe090b979c18f7e11a15da08a7c4a43b31bb372a75f2a007aaf82b9c2edc6f93bd096aedb80fd40e3fda08f46affa38fee49b69_1280.png",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 0.993,
+   "colors": [
+    "화이트",
+    "민트"
+   ]
+  },
+  "occasion_fit": {
+   "외출": 0.39,
+   "여행": 0.217,
+   "운동": 0.186,
+   "친구 약속": 0.174,
+   "집에서": 0.025,
+   "데이트": 0.005,
+   "출근": 0.004,
+   "면접": 0.0
+  }
+ },
+ "black-tee": {
+  "photo": {
+   "id": 1886001,
+   "url": "https://pixabay.com/photos/blank-tshirt-male-fashion-top-1886001/",
+   "photographer": "nattyjeff",
+   "photographer_url": "https://pixabay.com/users/nattyjeff-1836617/",
+   "src": "https://pixabay.com/get/g47ea4bb5949eed37b026b355450c15944001b007d9fd0603e90e71e043767a80fa8fa96729d3b09ca388f001b174dcbbe0f248d1fd42d9560c1cdf9468aaf51a_1280.png",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "person": 0.088,
+   "category": 0.994,
+   "colors": [
+    "블랙",
+    "차콜"
+   ]
+  },
+  "occasion_fit": {
+   "외출": 0.448,
+   "친구 약속": 0.313,
+   "여행": 0.158,
+   "운동": 0.042,
+   "데이트": 0.021,
+   "출근": 0.013,
+   "집에서": 0.006,
+   "면접": 0.0
+  },
+  "banned": [
+   5328923
+  ]
+ },
+ "white-shirt": {
+  "photo": null,
+  "rejected": "상품 사진 아님 29, 중복·제외 1",
+  "banned": [
+   4792226
+  ]
+ },
+ "blue-oxford": {
+  "photo": null,
+  "rejected": "상품 사진 아님 27, 사람이 찍힘 2, 중복·제외 1",
+  "banned": [
+   2681507
+  ]
+ },
+ "linen-shirt": {
+  "photo": null,
+  "rejected": "상품 사진 아님 26, 종류 다름 1, 중복·제외 3",
+  "banned": [
+   3558931,
+   2728678
+  ]
+ },
+ "stripe-long-tee": {
+  "photo": null,
+  "rejected": "상품 사진 아님 22, 사람이 찍힘 4, 종류 다름 2, 중복·제외 2",
+  "banned": [
+   683661
+  ]
+ },
+ "navy-polo": {
+  "photo": null,
+  "rejected": "상품 사진 아님 26, 사람이 찍힘 3, 중복·제외 1",
+  "banned": [
+   8012239
+  ]
+ },
+ "gray-sweatshirt": {
+  "photo": null,
+  "rejected": "상품 사진 아님 27, 종류 다름 1, 색 다름 2"
+ },
+ "gray-hoodie": {
+  "photo": null,
+  "rejected": "상품 사진 아님 25, 사람이 찍힘 4, 중복·제외 1",
+  "banned": [
+   5185570
+  ]
+ },
+ "navy-knit": {
+  "photo": {
+   "id": 1283863,
+   "url": "https://pixabay.com/photos/fashion-sweater-wool-clothing-1283863/",
+   "photographer": "Pexels",
+   "photographer_url": "https://pixabay.com/users/Pexels-2286921/",
+   "src": "https://pixabay.com/get/ga4e39066a543daf5726029f542eefba0814e2ae996fc4cfd36fdb4e8894dc5035af9f821629d67ecac8c1a3d83028a25d55d3df7358346ff1d69b632a83b79ac_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "person": 0.048,
+   "category": 0.974,
+   "colors": [
+    "네이비",
+    "블루"
+   ]
+  },
+  "occasion_fit": {
+   "집에서": 0.953,
+   "여행": 0.023,
+   "친구 약속": 0.011,
+   "출근": 0.005,
+   "운동": 0.003,
+   "외출": 0.003,
+   "데이트": 0.0,
+   "면접": 0.0
+  },
+  "banned": [
+   3054364
+  ]
+ },
+ "beige-knit": {
+  "photo": null,
+  "rejected": "상품 사진 아님 16, 사람이 찍힘 8, 종류 다름 4, 중복·제외 2",
+  "banned": [
+   7876679
+  ]
+ },
+ "black-turtleneck": {
+  "photo": null,
+  "rejected": "상품 사진 아님 22, 사람이 찍힘 6, 중복·제외 2",
+  "banned": [
+   3054343
+  ]
+ },
+ "white-blouse": {
+  "photo": null,
+  "rejected": "상품 사진 아님 13, 사람이 찍힘 16, 중복·제외 1",
+  "banned": [
+   1623091
+  ]
+ },
+ "blue-jeans": {
+  "photo": {
+   "id": 2799489,
+   "url": "https://pixabay.com/photos/woman-jeans-fashion-clothing-2799489/",
+   "photographer": "Marlon_Delibasic",
+   "photographer_url": "https://pixabay.com/users/Marlon_Delibasic-2105117/",
+   "src": "https://pixabay.com/get/ga6990a908341c6b413e9f4de97e9e2c75210c6737faa15c2f33d2c1dfdb1580cbffa78131ec000b2a2dc77ac6f7060cdf564ec5b115d8ca87e73b1a1b2739a1c_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "person": 0.013,
+   "category": 0.997,
+   "colors": [
+    "블루",
+    "네이비"
+   ]
+  },
+  "occasion_fit": {
+   "친구 약속": 0.34,
+   "외출": 0.325,
+   "여행": 0.299,
+   "데이트": 0.014,
+   "출근": 0.014,
+   "집에서": 0.005,
+   "운동": 0.002,
+   "면접": 0.001
+  },
+  "banned": [
+   4195519
+  ]
+ },
+ "black-jeans": {
+  "photo": {
+   "id": 3740369,
+   "url": "https://pixabay.com/photos/male-pants-fashion-leg-people-man-3740369/",
+   "photographer": "Engin_Akyurt",
+   "photographer_url": "https://pixabay.com/users/Engin_Akyurt-3656355/",
+   "src": "https://pixabay.com/get/g07d56028c3138fcf9f47f701ee2da07ffd38afd008e5e5699b267b4815f474c083308c99f5b9dcf896130d31ae7bdce0708d86ce87d985cc265b5f9c8c2364c6_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 1.0,
+   "colors": [
+    "차콜",
+    "그레이"
+   ]
+  },
+  "occasion_fit": {
+   "여행": 0.352,
+   "친구 약속": 0.239,
+   "운동": 0.149,
+   "출근": 0.124,
+   "외출": 0.086,
+   "집에서": 0.03,
+   "데이트": 0.014,
+   "면접": 0.006
+  }
+ },
+ "black-slacks": {
+  "photo": null,
+  "rejected": "상품 사진 아님 28, 종류 다름 1, 중복 1"
+ },
+ "beige-chinos": {
+  "photo": {
+   "id": 1866743,
+   "url": "https://pixabay.com/photos/adidas-boy-fashion-footwear-man-1866743/",
+   "photographer": "Pexels",
+   "photographer_url": "https://pixabay.com/users/Pexels-2286921/",
+   "src": "https://pixabay.com/get/g41407405ebc1e359f9f6b62e85a42cbfa724aa91dd9fb6997a42ae9fe5b25aa8dbaf1bfe5fb3d1ed3afdd06be8e544e89a100f8a1d2016a4f376135fec3d893d_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 0.95,
+   "person": 0.485,
+   "category": 0.99,
+   "colors": [
+    "카키",
+    "베이지"
+   ]
+  },
+  "occasion_fit": {
+   "친구 약속": 0.738,
+   "외출": 0.146,
+   "여행": 0.067,
+   "데이트": 0.041,
+   "출근": 0.007,
+   "집에서": 0.001,
+   "운동": 0.0,
+   "면접": 0.0
+  },
+  "banned": [
+   4104003
+  ]
+ },
+ "charcoal-wide": {
+  "photo": {
+   "id": 4953113,
+   "url": "https://pixabay.com/photos/fashion-clothes-woman-season-4953113/",
+   "photographer": "Engin_Akyurt",
+   "photographer_url": "https://pixabay.com/users/Engin_Akyurt-3656355/",
+   "src": "https://pixabay.com/get/g48769db8247fdce3ed4d8e9261216061ec4681c51b57044f458056558b642871ee498db76072710ee513090bdc746d9b10b3d3303e3330d0cfb5a34e7a573030_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 0.999,
+   "colors": [
+    "블랙",
+    "민트"
+   ]
+  },
+  "occasion_fit": {
+   "여행": 0.273,
+   "운동": 0.269,
+   "친구 약속": 0.16,
+   "출근": 0.146,
+   "집에서": 0.053,
+   "외출": 0.044,
+   "면접": 0.038,
+   "데이트": 0.015
+  }
+ },
+ "gray-sweatpants": {
+  "photo": {
+   "id": 3501273,
+   "url": "https://pixabay.com/photos/sport-clothes-fashion-healthy-3501273/",
+   "photographer": "Engin_Akyurt",
+   "photographer_url": "https://pixabay.com/users/Engin_Akyurt-3656355/",
+   "src": "https://pixabay.com/get/g07dcf0f35a68eb8b584da6d9067fcfcfdef8c45c8d34615165cd1d79c25c952a6dbe7a2d06a752dbd754ad6efe516a66fa18e71ea55911104973bbb8df1ae42d_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 1.0,
+   "colors": [
+    "차콜",
+    "그레이"
+   ]
+  },
+  "occasion_fit": {
+   "집에서": 0.397,
+   "여행": 0.276,
+   "출근": 0.16,
+   "운동": 0.108,
+   "친구 약속": 0.03,
+   "면접": 0.017,
+   "외출": 0.01,
+   "데이트": 0.001
+  }
+ },
+ "denim-shorts": {
+  "photo": {
+   "id": 785990,
+   "url": "https://pixabay.com/photos/jeans-denim-fashion-pants-closeup-785990/",
+   "photographer": "myMuzick",
+   "photographer_url": "https://pixabay.com/users/myMuzick-776418/",
+   "src": "https://pixabay.com/get/g4079d2e432bcf5dc3964f1069b1003aa55ce3a66857b5bf3d2fd930b1f271b4415ac00bb47f429a675ed85ef1c756858b187146c3cdb7aaf965087df3e9065a9_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 0.999,
+   "colors": [
+    "블루",
+    "스카이블루"
+   ]
+  },
+  "occasion_fit": {
+   "외출": 0.443,
+   "친구 약속": 0.43,
+   "여행": 0.076,
+   "데이트": 0.045,
+   "출근": 0.003,
+   "운동": 0.002,
+   "집에서": 0.0,
+   "면접": 0.0
+  }
+ },
+ "black-pleated-skirt": {
+  "photo": null,
+  "rejected": "상품 사진 아님 20, 사람이 찍힘 9, 중복·제외 1",
+  "banned": [
+   5052288
+  ]
+ },
+ "beige-long-skirt": {
+  "photo": null,
+  "rejected": "상품 사진 아님 23, 사람이 찍힘 6, 중복·제외 1",
+  "banned": [
+   5205685
+  ]
+ },
+ "beige-trench": {
+  "photo": {
+   "id": 7166177,
+   "url": "https://pixabay.com/photos/woman-overcoat-fashion-street-7166177/",
+   "photographer": "Surprising_Media",
+   "photographer_url": "https://pixabay.com/users/Surprising_Media-11873433/",
+   "src": "https://pixabay.com/get/g86a332ed5b311495d9721b7572889da48143cf0e6b8a318d22f9997da920d80f17d3260a12ad8957704a0004430422b7079dab55f630dc6d521d8342255108da_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 0.959,
+   "person": 0.451,
+   "category": 0.962,
+   "colors": [
+    "베이지",
+    "카키"
+   ]
+  },
+  "occasion_fit": {
+   "친구 약속": 0.563,
+   "외출": 0.222,
+   "출근": 0.141,
+   "데이트": 0.057,
+   "여행": 0.016,
+   "면접": 0.001,
+   "집에서": 0.0,
+   "운동": 0.0
+  },
+  "banned": [
+   4018445
+  ]
+ },
+ "black-coat": {
+  "photo": null,
+  "rejected": "상품 사진 아님 22, 사람이 찍힘 5, 종류 다름 1, 중복·제외 2",
+  "banned": [
+   3240653
+  ]
+ },
+ "camel-coat": {
+  "photo": null,
+  "rejected": "상품 사진 아님 17, 사람이 찍힘 11, 종류 다름 1, 중복·제외 1",
+  "banned": [
+   6399035
+  ]
+ },
+ "denim-jacket": {
+  "photo": null,
+  "rejected": "상품 사진 아님 18, 사람이 찍힘 8, 종류 다름 3, 중복·제외 1",
+  "banned": [
+   2411730
+  ]
+ },
+ "black-padding": {
+  "photo": null,
+  "rejected": "상품 사진 아님 28, 사람이 찍힘 1, 중복·제외 1",
+  "banned": [
+   6009977
+  ]
+ },
+ "leather-jacket": {
+  "photo": {
+   "id": 4536550,
+   "url": "https://pixabay.com/photos/love-woman-man-romantic-go-stroll-4536550/",
+   "photographer": "birgl",
+   "photographer_url": "https://pixabay.com/users/birgl-6508325/",
+   "src": "https://pixabay.com/get/g44067270ad9009ac1f6594148289105cfde97aab35e814e0e8690d0079424cb481b99ea08008cc86143439de41b4d9300254cea5071282acf4d18a2dcdf9a508_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 0.943,
+   "person": 0.121,
+   "category": 0.846,
+   "colors": [
+    "블랙",
+    "네이비"
+   ]
+  },
+  "occasion_fit": {
+   "친구 약속": 0.472,
+   "데이트": 0.243,
+   "출근": 0.138,
+   "외출": 0.107,
+   "면접": 0.032,
+   "여행": 0.006,
+   "운동": 0.001,
+   "집에서": 0.001
+  },
+  "banned": [
+   2911327,
+   4536550
+  ]
+ },
+ "gray-blazer": {
+  "photo": null,
+  "rejected": "상품 사진 아님 22, 사람이 찍힘 6, 중복·제외 2",
+  "banned": [
+   3740349
+  ]
+ },
+ "navy-cardigan": {
+  "photo": null,
+  "rejected": "상품 사진 아님 23, 사람이 찍힘 5, 종류 다름 1, 중복·제외 1",
+  "banned": [
+   4921663
+  ]
+ },
+ "fleece": {
+  "photo": null,
+  "rejected": "상품 사진 아님 27, 종류 다름 1, 색 다름 2"
+ },
+ "windbreaker": {
+  "photo": null,
+  "rejected": "상품 사진 아님 29, 중복·제외 1",
+  "banned": [
+   5273705
+  ]
+ },
+ "white-sneakers": {
+  "photo": {
+   "id": 2465915,
+   "url": "https://pixabay.com/photos/sports-shoe-shoe-running-sneakers-2465915/",
+   "photographer": "Monfocus",
+   "photographer_url": "https://pixabay.com/users/Monfocus-2516394/",
+   "src": "https://pixabay.com/get/g097a35556e6a3bb5688a66ab708a5e5572f58a9935bd584d772da38f770bca8d397a82a626168595ef40b254928a7ba06ab7007f8e85d62fe98e58704cbd2705_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 1.0,
+   "colors": [
+    "화이트",
+    "아이보리"
+   ]
+  },
+  "occasion_fit": {
+   "친구 약속": 0.353,
+   "운동": 0.229,
+   "외출": 0.15,
+   "여행": 0.14,
+   "출근": 0.06,
+   "집에서": 0.046,
+   "데이트": 0.011,
+   "면접": 0.011
+  }
+ },
+ "black-loafers": {
+  "photo": {
+   "id": 4887100,
+   "url": "https://pixabay.com/photos/shoes-mens-black-fashion-dress-4887100/",
+   "photographer": "ds_30",
+   "photographer_url": "https://pixabay.com/users/ds_30-1795490/",
+   "src": "https://pixabay.com/get/g8f79b43f709a00f676d9c5af8089af7af80ebf0ca85b9d943c14cfa4f201519eee4b87a08f75d8095a3756542f539be1294a51f11efe6b63c84d7b7d0e299eb2_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 1.0,
+   "colors": [
+    "블랙",
+    "와인"
+   ]
+  },
+  "occasion_fit": {
+   "면접": 0.723,
+   "출근": 0.267,
+   "여행": 0.004,
+   "데이트": 0.003,
+   "친구 약속": 0.002,
+   "외출": 0.001,
+   "운동": 0.001,
+   "집에서": 0.0
+  }
+ },
+ "running-shoes": {
+  "photo": null,
+  "rejected": "상품 사진 아님 3, 종류 다름 5, 색 다름 6"
+ },
+ "chelsea-boots": {
+  "photo": {
+   "id": 3262960,
+   "url": "https://pixabay.com/photos/leather-fashion-foot-clothing-3262960/",
+   "photographer": "orhanyunus18",
+   "photographer_url": "https://pixabay.com/users/orhanyunus18-7628115/",
+   "src": "https://pixabay.com/get/g3a090d655c316ec04001ea301ccc282dd964fd79c43a376e3cb223b59b0ee38607f53e418f88f6104114cd385513e3126da08e7c245afba37a63b129b3ef4720_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 0.999,
+   "colors": [
+    "블랙",
+    "네이비"
+   ]
+  },
+  "occasion_fit": {
+   "출근": 0.572,
+   "친구 약속": 0.221,
+   "외출": 0.095,
+   "데이트": 0.043,
+   "여행": 0.032,
+   "면접": 0.026,
+   "운동": 0.007,
+   "집에서": 0.005
+  }
+ },
+ "sandals": {
+  "photo": {
+   "id": 6701631,
+   "url": "https://pixabay.com/photos/shoes-footwear-fashion-high-heels-6701631/",
+   "photographer": "cosmistic",
+   "photographer_url": "https://pixabay.com/users/cosmistic-23808364/",
+   "src": "https://pixabay.com/get/g72da530641de8060fd8022388b6ea56de4f8d527bdf3dd6e52a4c011e4eaf3ca21081e17c826a709788034ea006fd170abb9312b0a51189023dd07711a643bf7_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 0.999,
+   "colors": [
+    "베이지",
+    "아이보리"
+   ]
+  },
+  "occasion_fit": {
+   "데이트": 0.899,
+   "외출": 0.029,
+   "여행": 0.025,
+   "친구 약속": 0.023,
+   "집에서": 0.013,
+   "출근": 0.007,
+   "면접": 0.003,
+   "운동": 0.0
+  }
+ },
+ "black-tote": {
+  "photo": {
+   "id": 883116,
+   "url": "https://pixabay.com/photos/handbag-purse-fashion-bag-female-883116/",
+   "photographer": "jumpinjake",
+   "photographer_url": "https://pixabay.com/users/jumpinjake-1287798/",
+   "src": "https://pixabay.com/get/g80518acca20e1b1dfd64add80083f054b8fe9df10bd3f5c0985e5004e24f3ec7259d771d484bf229133a4eb0293ac4fff0ce5bd1c5fe128625f0d7c51e1a24fe_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 1.0,
+   "colors": [
+    "블랙",
+    "와인"
+   ]
+  },
+  "occasion_fit": {
+   "데이트": 0.536,
+   "외출": 0.163,
+   "친구 약속": 0.134,
+   "출근": 0.108,
+   "여행": 0.05,
+   "면접": 0.006,
+   "운동": 0.003,
+   "집에서": 0.0
+  }
+ },
+ "canvas-tote": {
+  "photo": null,
+  "rejected": "상품 사진 아님 9, 색 다름 6, 중복·제외 2",
+  "banned": [
+   1032676
+  ]
+ },
+ "brown-crossbody": {
+  "photo": {
+   "id": 3752192,
+   "url": "https://pixabay.com/photos/nature-fashion-woman-female-3752192/",
+   "photographer": "Wolferl",
+   "photographer_url": "https://pixabay.com/users/Wolferl-13829/",
+   "src": "https://pixabay.com/get/g05b3ba67b34b1cc0590d1debe553980f5ef195734c946941d4d8a8868e6bbb1c52fb5be30c2027d72b4a387811f7f3ccbe56a7bd7d74e4fd1fc260d57cbd35e5_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 1.0,
+   "category": 1.0,
+   "colors": [
+    "브라운",
+    "와인"
+   ]
+  },
+  "occasion_fit": {
+   "친구 약속": 0.465,
+   "여행": 0.164,
+   "출근": 0.162,
+   "데이트": 0.105,
+   "외출": 0.095,
+   "면접": 0.009,
+   "집에서": 0.0,
+   "운동": 0.0
+  }
+ },
+ "black-backpack": {
+  "photo": null,
+  "rejected": "상품 사진 아님 26, 종류 다름 1, 색 다름 3"
+ },
+ "gray-beanie": {
+  "photo": null,
+  "rejected": "상품 사진 아님 25, 사람이 찍힘 5",
+  "banned": []
+ },
+ "black-cap": {
+  "photo": {
+   "id": 995624,
+   "url": "https://pixabay.com/photos/hats-snapback-hat-kanati-kanati-co-995624/",
+   "photographer": "Poolloofa",
+   "photographer_url": "https://pixabay.com/users/Poolloofa-1534259/",
+   "src": "https://pixabay.com/get/g30e73892f3d5d51581141c66c6b9627bc8ebfef9d65aef814ae8436190e5018b183e27760f22fc4e4feddd96bb35dfdd78b9fe3ec64c701fd5cdc101550798c5_1280.jpg",
+   "source": "Pixabay"
+  },
+  "checks": {
+   "product": 0.999,
+   "person": 0.034,
+   "category": 0.993,
+   "colors": [
+    "블랙",
+    "그레이"
+   ]
+  },
+  "occasion_fit": {
+   "외출": 0.359,
+   "운동": 0.305,
+   "친구 약속": 0.177,
+   "여행": 0.074,
+   "출근": 0.047,
+   "데이트": 0.027,
+   "집에서": 0.011,
+   "면접": 0.001
+  },
+  "banned": []
+ },
+ "check-scarf": {
+  "photo": null,
+  "rejected": "상품 사진 아님 16, 사람이 찍힘 12, 색 다름 2",
+  "banned": []
+ }
+}

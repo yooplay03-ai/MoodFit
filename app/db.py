@@ -28,7 +28,8 @@ def get_db():
 
 
 # 나중에 추가한 열 — 이미 만든 DB 파일에도 넣어 준다 (create_all은 있는 테이블을 바꾸지 않는다)
-ADDED_COLUMNS = {"clothing_items": {"season_by_user": "BOOLEAN NOT NULL DEFAULT 0"}}
+ADDED_COLUMNS = {"clothing_items": {"season_by_user": "BOOLEAN NOT NULL DEFAULT 0", "occasion_fit": "TEXT",
+                                     "category_by_user": "BOOLEAN NOT NULL DEFAULT 0", "source": "VARCHAR(40)"}}
 
 
 def add_missing_columns():

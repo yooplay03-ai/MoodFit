@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MoodFit — 오늘 뭐 입지?</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<title>MoodFit</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -13,8 +12,8 @@
 <!-- ── 로그인 ─────────────────────────────────────── -->
 <section id="authScreen" class="auth" hidden>
   <div class="auth-box">
-    <div class="logo logo-lg">Mood<em>Fit</em></div>
-    <p class="muted">기분·날씨·상황에 맞춰 내 옷장에서 오늘의 코디를 골라 드려요.</p>
+    <div class="logo logo-lg">moodfit</div>
+    <p class="muted">날씨와 일정에 맞춰, 내 옷장에 있는 옷으로 코디를 짜 줍니다.</p>
 
     <div class="segmented" role="tablist">
       <button class="seg active" data-auth-tab="login" role="tab" type="button">로그인</button>
@@ -43,15 +42,15 @@
 <!-- ── 앱 ─────────────────────────────────────────── -->
 <div id="appScreen" hidden>
   <header class="topbar">
-    <div class="logo">Mood<em>Fit</em></div>
+    <div class="logo">moodfit</div>
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="today" role="tab">오늘의 코디</button>
-      <button class="tab" data-tab="wardrobe" role="tab">내 옷장 <span class="count" id="wardrobeCount"></span></button>
-      <button class="tab" data-tab="profile" role="tab">내 프로필</button>
+      <button class="tab active" data-tab="today" role="tab">오늘 코디</button>
+      <button class="tab" data-tab="wardrobe" role="tab">옷장 <span class="count" id="wardrobeCount"></span></button>
+      <button class="tab" data-tab="profile" role="tab">프로필</button>
     </nav>
     <div class="user">
       <span id="nickname"></span>
-      <button class="btn btn-ghost btn-sm" id="logoutBtn">로그아웃</button>
+      <button class="text-btn" id="logoutBtn">로그아웃</button>
     </div>
   </header>
 
@@ -59,25 +58,26 @@
     <!-- 오늘의 코디 -->
     <section id="tab-today" class="tab-panel">
       <div class="today-grid">
-        <div class="card">
-          <h2 class="card-title">오늘의 날씨</h2>
+        <div class="conditions">
+          <h2 class="card-title">날씨</h2>
           <div class="weather">
             <div class="weather-main">
               <span class="weather-temp" id="wTemp">--</span><span class="weather-unit">°C</span>
               <div>
-                <div id="wDesc" class="weather-desc">날씨를 불러오세요</div>
+                <div id="wDesc" class="weather-desc">도시를 검색하거나 현재 위치를 쓰세요</div>
                 <div id="wMeta" class="muted small"></div>
+                <div id="wSrc" class="muted small"></div>
               </div>
             </div>
             <div class="row">
               <input id="cityInput" placeholder="도시 (예: 서울, 수원)" list="cityList">
               <datalist id="cityList"></datalist>
               <button class="btn btn-ghost btn-sm" id="citySearchBtn" type="button">검색</button>
-              <button class="btn btn-ghost btn-sm" id="geoBtn" type="button">📍 현재 위치</button>
+              <button class="btn btn-ghost btn-sm" id="geoBtn" type="button">현재 위치</button>
             </div>
             <p class="small muted" id="weatherMsg"></p>
             <details id="manualWeather">
-              <summary>직접 입력하기</summary>
+              <summary>기온 직접 입력</summary>
               <div class="row">
                 <label>기온 <input id="mTemp" type="number" min="-30" max="45" value="15"> °C</label>
                 <label>날씨
@@ -88,41 +88,58 @@
             </details>
           </div>
 
-          <h2 class="card-title">오늘의 기분</h2>
+          <h2 class="card-title">기분</h2>
           <div class="chips" id="moodChips" data-single></div>
 
-          <h2 class="card-title">오늘의 상황 <span class="muted small">최대 4개</span></h2>
+          <h2 class="card-title">일정 <span class="muted small">최대 4개</span></h2>
           <div class="chips" id="occasionChips"></div>
 
           <h2 class="card-title">선호 스타일</h2>
           <div class="chips" id="styleChips" data-single></div>
 
-          <button class="btn btn-primary btn-lg" id="recommendBtn" type="button">✦ 오늘의 코디 추천받기</button>
+          <button class="btn btn-primary btn-lg" id="recommendBtn" type="button">코디 추천받기</button>
           <p class="small muted" id="wardrobeNote"></p>
+          <button class="text-btn" id="evalBtn" type="button">코디 평가하기</button>
         </div>
 
-        <div class="card result" id="resultCard">
+        <div class="result" id="resultCard">
           <div class="empty" id="resultEmpty">
-            <div class="empty-icon">✦</div>
-            <p>조건을 고르고 추천받기를 눌러 보세요.</p>
-            <p class="small muted">옷장에 옷을 등록해 두면 내가 가진 옷 중에서 골라 드려요.</p>
+            <p class="empty-title">오늘 입을 옷을 골라 드릴게요</p>
+            <p class="small muted">왼쪽에서 날씨와 일정을 정하고 코디 추천받기를 누르세요.</p>
           </div>
           <div class="loading" id="resultLoading" hidden><div class="spinner"></div><span>코디를 고르는 중…</span></div>
           <div id="resultBody" hidden>
-            <h2 class="card-title">오늘의 코디</h2>
-            <div class="pick-grid" id="pickGrid"></div>
+            <div class="row space-between">
+              <div class="outfit-tabs" id="outfitTabs"></div>
+            </div>
+            <div class="outfit-board" id="pickGrid"></div>
             <div class="answer" id="answerText"></div>
-            <details class="why">
-              <summary>어떻게 골랐나요?</summary>
-              <p class="small">옷마다 <b>날씨(계절) 30 · 상황 25 · 기분 20 · 최근 착용 10 · 색상 정보 5</b>점으로 점수를 매겨,
-                카테고리별 1순위를 AI에게 먼저 알려 줬어요. AI는 그 안에서 조합을 고르고 이유를 설명해요.</p>
-              <ul class="small" id="candidateList"></ul>
+            <ul class="reasons" id="reasonList"></ul>
+            <details class="why" id="whyBox">
+              <summary>점수 자세히 보기</summary>
+              <div class="bars" id="scoreBars"></div>
+              <p class="small muted">내 옷으로 만들 수 있는 조합을 모두 비교해 날씨 35점, 일정 30점, 색 조합 20점, 새로움 10점, 기분과 스타일 5점으로 매겼어요.
+                일정 점수는 옷 사진을 FashionCLIP으로 분석한 값이고, 설명 문장만 LLM이 씁니다.</p>
             </details>
             <div class="row">
-              <button class="btn btn-primary" id="wearBtn" type="button" hidden>이 코디로 결정</button>
-              <button class="btn btn-ghost" id="againBtn" type="button">다시 추천받기</button>
+              <button class="btn btn-primary" id="wearBtn" type="button" hidden>오늘 이거 입기</button>
+              <button class="btn btn-ghost rate-btn" data-rate="1" type="button" hidden>좋아요</button>
+              <button class="btn btn-ghost rate-btn" data-rate="-1" type="button" hidden>별로예요</button>
+              <button class="text-btn" id="againBtn" type="button">다시 추천</button>
             </div>
             <p class="small muted" id="wearMsg"></p>
+          </div>
+          <div id="evalBody" hidden>
+            <h2 class="card-title">코디 평가</h2>
+            <p class="small muted">점수가 높은 코디와 낮은 코디를 섞어서 보여 줍니다. 점수는 숨겨 두었어요.
+              오늘 입고 싶은지만 고르면, 모인 평가로 추천 점수가 내 취향과 맞는지 잽니다.</p>
+            <div class="outfit-board" id="evalBoard"></div>
+            <div class="row">
+              <button class="btn btn-primary" data-eval="1" type="button">입을래요</button>
+              <button class="btn btn-ghost" data-eval="-1" type="button">별로예요</button>
+              <button class="text-btn" id="evalStopBtn" type="button">그만하기</button>
+            </div>
+            <p class="small muted" id="evalMsg"></p>
           </div>
           <p class="form-error" id="resultError"></p>
         </div>
@@ -131,26 +148,27 @@
 
     <!-- 내 옷장 -->
     <section id="tab-wardrobe" class="tab-panel" hidden>
-      <div class="card">
-        <div class="row space-between">
-          <div class="chips" id="filterChips" data-single></div>
+      <div class="closet">
+        <div class="row space-between closet-bar">
+          <div class="filter-tabs" id="filterChips" data-single></div>
           <div class="row">
-            <label class="btn btn-ghost btn-sm">📷 여러 장 한 번에
+            <button class="btn btn-ghost btn-sm" id="catalogBtn" type="button">기본 옷으로 채우기</button>
+            <label class="btn btn-ghost btn-sm">여러 장 올리기
               <input type="file" accept="image/*" multiple id="bulkInput" hidden>
             </label>
-            <button class="btn btn-ghost btn-sm" id="reanalyzeAllBtn" type="button" hidden>↻ 모두 다시 분석</button>
-            <button class="btn btn-primary btn-sm" id="addItemBtn" type="button">+ 옷 추가</button>
+            <button class="btn btn-ghost btn-sm" id="reanalyzeAllBtn" type="button" hidden>모두 다시 분석</button>
+            <button class="btn btn-primary btn-sm" id="addItemBtn" type="button">옷 추가</button>
           </div>
         </div>
         <p class="hint" id="unclassifiedHint" hidden></p>
         <p class="hint" id="seasonHint" hidden></p>
-        <div class="item-grid" id="itemGrid"></div>
+        <div class="shelves" id="itemGrid"></div>
       </div>
     </section>
 
     <!-- 내 프로필 -->
     <section id="tab-profile" class="tab-panel" hidden>
-      <form class="card profile" id="profileForm">
+      <form class="profile" id="profileForm">
         <p class="muted small">추천할 때 참고하는 정보예요. 모두 선택 사항이에요.</p>
         <h2 class="card-title">성별</h2><div class="chips" data-field="gender" data-single></div>
         <h2 class="card-title">체형</h2><div class="chips" data-field="body_type" data-single></div>
@@ -173,13 +191,17 @@
 <dialog id="itemDialog">
   <form class="stack" id="itemForm">
     <h3 id="itemDialogTitle">옷 추가</h3>
+    <div class="row link-row" id="linkRow">
+      <input type="url" id="linkUrl" placeholder="상품 링크 붙여넣기 (무신사, 29CM 등)" autocomplete="off">
+      <button class="btn btn-ghost btn-sm" id="linkBtn" type="button">가져오기</button>
+    </div>
     <label class="photo-drop" id="photoDrop">
       <img id="photoPreview" alt="" hidden>
-      <span id="photoText">📷 사진 선택 (선택 사항)</span>
+      <span id="photoText">사진 선택 (없어도 돼요)</span>
       <input type="file" accept="image/*" id="photoInput" hidden>
     </label>
     <p class="small muted tag-status" id="tagStatus"></p>
-    <h4>카테고리</h4><div class="chips" data-item="category" data-single></div>
+    <h4>종류</h4><div class="chips" data-item="category" data-single></div>
     <h4>계절</h4><div class="chips" data-item="season" data-single></div>
     <h4>스타일</h4><div class="chips" data-item="style" data-single></div>
     <div class="row">
@@ -192,6 +214,22 @@
       <button class="btn btn-ghost" type="button" id="itemCancelBtn">취소</button>
     </div>
   </form>
+</dialog>
+
+<dialog id="catalogDialog" class="catalog-dialog">
+  <div class="row space-between">
+    <h3>기본 옷으로 채우기</h3>
+    <button class="text-btn" type="button" id="catalogCloseBtn">닫기</button>
+  </div>
+  <p class="small muted">가진 옷과 비슷한 것을 고르세요. 실제 사진이 아니어도 추천은 똑같이 됩니다. 나중에 내 사진이나 상품 링크로 바꿀 수 있어요.</p>
+  <div id="catalogBody"></div>
+  <div class="catalog-foot">
+    <span class="small muted" id="catalogCredit"></span>
+    <div class="row">
+      <span id="catalogCount" class="small">0벌 선택</span>
+      <button class="btn btn-primary" type="button" id="catalogAddBtn" disabled>옷장에 넣기</button>
+    </div>
+  </div>
 </dialog>
 
 <script src="/static/app.js"></script>

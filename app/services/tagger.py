@@ -40,7 +40,8 @@ def probe_path(model_id: str = None) -> Path:
 
 # 라벨마다 영어 문장 여러 개 (CLIP은 영어 문장으로 학습됨)
 CATEGORY_PROMPTS = {
-    "상의": ["a t-shirt", "a shirt", "a sweater", "a hoodie", "a blouse", "a sweatshirt", "a knit top"],
+    # 폴로 셔츠: 실제 사진 평가에서 단추·카라 때문에 아우터로 헷갈려 문장을 추가했다
+    "상의": ["a t-shirt", "a shirt", "a sweater", "a hoodie", "a blouse", "a sweatshirt", "a knit top", "a polo shirt"],
     "하의": ["a pair of jeans", "a pair of trousers", "a pair of shorts", "a skirt", "a pair of track pants"],
     "아우터": ["a jacket", "a coat", "a blazer", "a padded jacket", "a cardigan", "a trench coat"],
     "신발": ["a pair of sneakers", "a pair of shoes", "a pair of boots", "a pair of sandals", "a pair of loafers"],
@@ -70,9 +71,21 @@ STYLE_PROMPTS = {
     "스포티": ["sportswear", "athletic gym clothing"],
 }
 
+# 상황 적합도 — 추천에서 "이 옷이 출근·데이트…에 어울리는 정도"로 쓴다 (app/services/outfits.py)
+OCCASION_PROMPTS = {
+    "출근": ["an office outfit", "business casual workwear", "a neat outfit for work"],
+    "데이트": ["a stylish outfit for a date", "a nice outfit for a dinner date"],
+    "친구 약속": ["a casual outfit for meeting friends", "trendy everyday clothing"],
+    "면접": ["a formal job interview outfit", "a business suit"],
+    "외출": ["an everyday casual outfit", "clothing for going out in the city"],
+    "운동": ["sportswear for the gym", "athletic workout clothing"],
+    "여행": ["a comfortable travel outfit", "relaxed vacation clothing"],
+    "집에서": ["comfortable loungewear", "homewear for relaxing at home"],
+}
+
 # 이름 붙이기용 세부 종류 (분류 정확도에 영향을 주지 않도록 CATEGORY_PROMPTS와 따로 둔다)
 KIND_PROMPTS = {
-    "상의": {"티셔츠": "a t-shirt", "셔츠": "a button-up shirt", "니트": "a knit sweater", "후드티": "a hoodie",
+    "상의": {"티셔츠": "a t-shirt", "셔츠": "a button-up shirt", "폴로 셔츠": "a polo shirt", "니트": "a knit sweater", "후드티": "a hoodie",
             "맨투맨": "a sweatshirt", "블라우스": "a blouse", "카디건": "a cardigan", "민소매": "a sleeveless top"},
     "하의": {"청바지": "a pair of jeans", "슬랙스": "a pair of tailored trousers", "와이드 팬츠": "a pair of wide-leg pants",
             "트레이닝 바지": "a pair of sweatpants", "반바지": "a pair of shorts", "미니스커트": "a mini skirt",
@@ -212,7 +225,7 @@ def _load():
 
     text_banks = {name: encode_texts(m) for name, m in
                   (("category", CATEGORY_PROMPTS), ("season", THICKNESS_PROMPTS), ("style", STYLE_PROMPTS),
-                   ("color", COLOR_PROMPTS))}
+                   ("color", COLOR_PROMPTS), ("occasion", OCCASION_PROMPTS))}
     # 이름용: 세부 종류 문장마다 벡터 하나씩 (평균 내지 않음)
     for category, kinds in KIND_PROMPTS.items():
         names = list(kinds)
@@ -273,6 +286,7 @@ def analyze(photo_bytes: bytes) -> dict:
         result["season"] = {"value": "사계절", "confidence": 1.0, "scores": {}, "method": "rule"}
     # 하의는 사진으로 원단 두께를 알기 어려워 계절이 자주 틀린다 → 화면에서 사용자 확인을 받게 표시
     result["season"]["needs_check"] = result["category"]["value"] in SEASON_CHECK_CATEGORIES
+    _, _, result["occasion_fit"] = classify(emb, *banks["occasion"])   # 상황별 확률 전체를 저장해 추천에 쓴다
     kmeans_color, share = dominant_color(image)
     result["color"]["kmeans"] = kmeans_color          # 비교용으로 함께 돌려준다
     # 이름 제안: 색 + 세부 종류 (예: "블랙 토트백")
@@ -281,3 +295,10 @@ def analyze(photo_bytes: bytes) -> dict:
         kind, kind_conf, _ = classify(emb, *kind_bank)
         result["name"] = {"value": f"{result['color']['value']} {kind}", "confidence": round(kind_conf, 3)}
     return result
+
+
+def occasion_scores(photo_bytes: bytes) -> dict:
+    """옷을 저장할 때 상황 적합도만 계산한다."""
+    _, _, _, banks, _ = _load()
+    emb = image_embedding(Image.open(io.BytesIO(photo_bytes)))
+    return classify(emb, *banks["occasion"])[2]

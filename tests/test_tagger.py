@@ -146,3 +146,16 @@ def test_old_database_gets_new_column(tmp_path):
     finally:
         app_db.engine = original
     assert "season_by_user" in {c["name"] for c in inspect(engine).get_columns("clothing_items")}
+
+
+def test_user_fixed_category_survives_reanalyze(client, monkeypatch):
+    """폴로 셔츠를 AI가 아우터로 봐도, 사용자가 상의로 고쳤으면 다시 분석이 덮어쓰지 않는다."""
+    from app.services import tagger
+    monkeypatch.setattr(tagger, "analyze", lambda data: {
+        "category": {"value": "아우터", "confidence": 0.8}, "season": {"value": "가을", "confidence": 0.6},
+        "style": {"value": "캐주얼", "confidence": 0.8}, "color": {"value": "화이트", "confidence": 0.7}})
+    headers = signup(client)
+    polo = client.post("/api/wardrobe", headers=headers, data={"category": "아우터"},
+                       files={"photo": ("p.jpg", jpeg((240, 240, 240)), "image/jpeg")}).json()
+    client.patch(f"/api/wardrobe/{polo['id']}", headers=headers, json={"category": "상의"})
+    assert client.post(f"/api/wardrobe/{polo['id']}/reanalyze", headers=headers).json()["category"] == "상의"

@@ -16,6 +16,7 @@ def client(tmp_path, monkeypatch):
     os.environ["DATABASE_URL"] = f"sqlite:///{tmp_path / 'test.db'}"
     os.environ["MEDIA_DIR"] = str(tmp_path / "media")
     os.environ["PHOTO_CUTOUT"] = "0"          # 테스트에서는 배경 제거 모델을 돌리지 않는다
+    os.environ["TAG_ON_SAVE"] = "0"           # CLIP 모델도 돌리지 않는다
     # 설정을 바꾼 뒤 앱 모듈을 새로 불러와야 임시 DB를 쓴다
     for name in [m for m in sys.modules if m == "app" or m.startswith("app.")]:
         del sys.modules[name]
